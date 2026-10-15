@@ -1,0 +1,9 @@
+{
+  "extends": "@rentflow/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "vite-plugin-pwa/react", "vite-plugin-pwa/info", "vite-plugin-pwa/pwa-assets"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  },
+  "include": ["src", "vite.config.ts", "tailwind.config.ts", "pwa-assets.config.ts", "capacitor.config.ts"]
+}

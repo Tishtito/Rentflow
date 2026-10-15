@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+  a {
+    @apply text-brand hover:text-brand-hover;
+  }
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand;
+  }
+}
+
+@layer utilities {
+  /* Money and counts line up in columns. */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}

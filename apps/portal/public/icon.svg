@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Rentflow mark (LogoMark house) on the app colour. Full-bleed so it works as a maskable icon. -->
+  <rect width="512" height="512" fill="#1D5A44"/>
+  <g transform="translate(256 262) scale(17) translate(-14 -14)" fill="none" stroke="#8FD1B0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M8 19v-6l6-4 6 4v6"/>
+    <path d="M12 19v-4h4v4"/>
+  </g>
+</svg>

@@ -1,0 +1,4 @@
+{
+  "extends": "@rentflow/config/tsconfig.base.json",
+  "include": ["src"]
+}
