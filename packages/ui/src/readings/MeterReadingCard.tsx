@@ -26,10 +26,15 @@ export function MeterReadingCard({
   task,
   onSave,
   onAddPhoto,
+  saving = false,
+  errors,
 }: {
   task: MeterReadingTask;
   onSave: (readings: Array<{ meter_id: number; reading: string }>) => void | Promise<void>;
   onAddPhoto?: (meterId: number) => void;
+  saving?: boolean;
+  /** API errors by meter id (e.g. "lower than the previous reading"). */
+  errors?: Partial<Record<number, string>>;
 }) {
   const [values, setValues] = useState<Record<number, string>>({});
   const remaining = task.meters.filter((m) => m.current_reading === null);
@@ -81,7 +86,8 @@ export function MeterReadingCard({
             <div className="flex items-baseline justify-between">
               <span className="font-semibold">{m.label}</span>
               <span className="num text-[13px] text-muted">
-                Last reading: {formatQuantity(m.previous_reading)} {m.unit_of_measure} on {formatDate(m.previous_date)}
+                Last reading: {formatQuantity(m.previous_reading)} {m.unit_of_measure}
+                {m.previous_date ? ` on ${formatDate(m.previous_date)}` : ' (starting reading)'}
               </span>
             </div>
             <TextField
@@ -91,7 +97,7 @@ export function MeterReadingCard({
               emphasis
               numeric
               value={value}
-              error={tooLow ? `Can't be lower than the last reading (${formatQuantity(m.previous_reading)}).` : undefined}
+              error={tooLow ? `Can't be lower than the last reading (${formatQuantity(m.previous_reading)}).` : errors?.[m.meter_id]}
               onChange={(e) => setValues((v) => ({ ...v, [m.meter_id]: e.target.value }))}
             />
             {u && (
@@ -119,7 +125,7 @@ export function MeterReadingCard({
         <Button
           variant="primary"
           size="xl"
-          disabled={remaining.some((m) => usage(m, values[m.meter_id] ?? '') === null)}
+          disabled={saving || remaining.some((m) => usage(m, values[m.meter_id] ?? '') === null)}
           onClick={() => onSave(remaining.map((m) => ({ meter_id: m.meter_id, reading: values[m.meter_id]! })))}
         >
           Save &amp; next unit

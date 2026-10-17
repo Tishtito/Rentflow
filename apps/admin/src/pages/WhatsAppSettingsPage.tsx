@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError, useAdminUser, useDisconnectWhatsApp, useSaveWhatsApp, useWhatsAppConnection, type SaveWhatsAppBody } from '@rentflow/api';
+import { ApiError, useCan, useDisconnectWhatsApp, useSaveWhatsApp, useWhatsAppConnection, type SaveWhatsAppBody } from '@rentflow/api';
 import { formatDateTime } from '@rentflow/core';
 import { Badge, Button, Card, ErrorState, LoadingState, Notice, PageHeader, TextField, WhatsAppStatusBadge } from '@rentflow/ui';
 
@@ -14,7 +14,7 @@ const empty: Required<SaveWhatsAppBody> = {
 
 /** Bills by WhatsApp from the landlord's own number (GET/PUT/DELETE /api/admin/whatsapp). */
 export function WhatsAppSettingsPage() {
-  const canEdit = useAdminUser().data?.role === 'landlord';
+  const canEdit = useCan()('whatsapp.manage');
   const connection = useWhatsAppConnection();
   const save = useSaveWhatsApp();
   const disconnect = useDisconnectWhatsApp();

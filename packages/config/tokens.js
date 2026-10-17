@@ -44,11 +44,25 @@ export const colors = {
   danger: { soft: '#F9E3E0', ink: '#7A1D17', strong: '#A3271F', line: '#E8B4AE' }, // failed, reversed, void
   info: { soft: '#DCE8F7', ink: '#163E6B' }, // issued, sent, onboarding
   gold: { soft: '#F2D58A', ink: '#3D2E00' }, // due-date pill, super admin tag, counts
+
+  // Auth screens only (login, sign-up, invitation): the dark "leaf" design (rentflow-auth.html).
+  auth: {
+    night: '#04140E', // page background
+    deep: '#0D3A27', // background glow
+    forest: '#0B3D2E', // welcome panel
+    leaf: { DEFAULT: '#1F6B45', dark: '#155034', light: '#226F48', vein: '#0E3B26' },
+    emerald: { DEFAULT: '#1E8E5A', hover: '#25A96B' }, // buttons, focused inputs
+    mint: '#3DDC97', // floating labels, links, accents
+    muted: '#A9B5AE', // secondary text on the dark card
+    error: '#FF6B6B',
+    amber: '#F5B942', // password strength "fair"
+  },
 };
 
 export const fonts = {
   display: ['"Bricolage Grotesque"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
   sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+  auth: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'], // auth screens only
 };
 
 export const radii = {

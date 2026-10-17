@@ -1,4 +1,4 @@
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '@rentflow/core';
 import { channelLabel } from '@rentflow/core';
 import type { Channel } from '@rentflow/core';
@@ -56,17 +56,56 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps & Omit<InputHTM
   },
 );
 
+/** Multi-line text with the same label / hint / error layout as TextField. */
+export function TextAreaField({
+  label,
+  hint,
+  error,
+  className,
+  id,
+  rows = 3,
+  ...rest
+}: { label: ReactNode; hint?: ReactNode; error?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const autoId = useId();
+  const inputId = id ?? autoId;
+  const hintId = hint || error ? `${inputId}-hint` : undefined;
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <label htmlFor={inputId} className="text-[13px] font-medium">
+        {label}
+      </label>
+      <textarea
+        id={inputId}
+        rows={rows}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={hintId}
+        className={cn(inputBase, 'min-h-touch resize-y py-2.5 leading-relaxed', error && 'border-danger-strong')}
+        {...rest}
+      />
+      {(error || hint) && (
+        <span id={hintId} className={cn('text-xs', error ? 'text-danger-strong' : 'text-muted')}>
+          {error ?? hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function SelectField({
   label,
   hideLabel,
   options,
   className,
   id,
+  error,
+  hint,
   ...rest
 }: {
   label: string;
   hideLabel?: boolean;
   options: Array<{ value: string; label: string }>;
+  error?: string;
+  hint?: ReactNode;
 } & SelectHTMLAttributes<HTMLSelectElement>) {
   const autoId = useId();
   const selectId = id ?? autoId;
@@ -75,13 +114,30 @@ export function SelectField({
       <label htmlFor={selectId} className={cn('text-[13px] font-medium', hideLabel && 'sr-only')}>
         {label}
       </label>
-      <select id={selectId} className={cn(inputBase, 'min-h-touch pr-8')} {...rest}>
+      <select
+        id={selectId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${selectId}-error` : hint ? `${selectId}-hint` : undefined}
+        className={cn(inputBase, 'min-h-touch pr-8', error && 'border-danger-strong')}
+        {...rest}
+      >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
       </select>
+      {error ? (
+        <span id={`${selectId}-error`} className="text-[13px] text-danger-strong">
+          {error}
+        </span>
+      ) : (
+        hint && (
+          <span id={`${selectId}-hint`} className="text-xs text-muted">
+            {hint}
+          </span>
+        )
+      )}
     </div>
   );
 }
@@ -248,6 +304,37 @@ export function SwitchRow({
         onChange={(e) => onChange(e.target.checked)}
         className="h-[22px] w-[22px] accent-brand"
       />
+    </label>
+  );
+}
+
+/** A checkbox with a label and optional hint below it (permission lists, multi-pick). */
+export function CheckboxField({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className={cn('flex min-h-touch cursor-pointer items-start gap-2.5 py-1.5 text-sm', disabled && 'cursor-default opacity-70')}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-brand"
+      />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-ink">{label}</span>
+        {hint && <span className="text-xs text-muted">{hint}</span>}
+      </span>
     </label>
   );
 }

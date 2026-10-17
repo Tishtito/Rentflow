@@ -70,12 +70,9 @@ export function createApiClient({ baseUrl = '', auth = 'cookie', tokenStore, onU
     csrfReady = true;
   }
 
-  async function request<T>(method: Method, path: string, body?: unknown, retried = false): Promise<T> {
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-    };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+  /** Auth + account headers shared by JSON requests and file downloads. */
+  async function authHeaders(method: Method, accept = 'application/json'): Promise<Record<string, string>> {
+    const headers: Record<string, string> = { Accept: accept, 'X-Requested-With': 'XMLHttpRequest' };
     if (accountId !== null) headers['X-Account-Id'] = String(accountId);
 
     if (auth === 'cookie') {
@@ -86,6 +83,12 @@ export function createApiClient({ baseUrl = '', auth = 'cookie', tokenStore, onU
       const token = await tokenStore!.get();
       if (token) headers.Authorization = `Bearer ${token}`;
     }
+    return headers;
+  }
+
+  async function request<T>(method: Method, path: string, body?: unknown, retried = false): Promise<T> {
+    const headers = await authHeaders(method);
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
 
     const res = await doFetch(`${baseUrl}${path}`, {
       method,
@@ -124,7 +127,20 @@ export function createApiClient({ baseUrl = '', auth = 'cookie', tokenStore, onU
     get: <T>(path: string) => request<T>('GET', path),
     post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
     put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body ?? {}),
+    patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body ?? {}),
     delete: <T>(path: string) => request<T>('DELETE', path),
+    /** GET a file (e.g. a bill PDF) with the same login as every other call. */
+    async download(path: string): Promise<Blob> {
+      const res = await doFetch(`${baseUrl}${path}`, {
+        headers: await authHeaders('GET', '*/*'),
+        credentials: auth === 'cookie' ? 'include' : 'omit',
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new ApiError(res.status, data?.message || `Download failed (${res.status})`, {});
+      }
+      return res.blob();
+    },
     /** Super admins acting inside one landlord account send X-Account-Id on every request. */
     setAccountId(id: number | null) {
       accountId = id;

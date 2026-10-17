@@ -22,8 +22,14 @@ export function SidePanel({
   className?: string;
 }) {
   const id = useId();
+  const ref = useRef<HTMLElement>(null);
+  // On narrow screens the panel wraps below the content: bring it into view when it opens.
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, []);
   return (
     <aside
+      ref={ref}
       aria-labelledby={id}
       className={cn(
         'box-border flex min-w-0 flex-[1_1_340px] flex-col gap-[18px] rounded-lg border border-line bg-surface p-[22px]',

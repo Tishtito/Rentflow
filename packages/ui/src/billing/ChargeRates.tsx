@@ -55,8 +55,12 @@ export function ChargeRateCard({
           className="flex flex-col gap-3 border-t border-line pt-3.5"
           onSubmit={async (e) => {
             e.preventDefault();
-            await onChangeRate({ rate: newRate, effective_from: from });
-            setEditing(false);
+            try {
+              await onChangeRate({ rate: newRate, effective_from: from });
+              setEditing(false);
+            } catch {
+              // Stay open; the page shows the API's error.
+            }
           }}
         >
           <span className="text-sm font-semibold">Change rate</span>

@@ -6,7 +6,7 @@ Stack: pnpm workspaces + Turborepo, Vite 5, React 18, TypeScript (strict), Tailw
 
 | App | Port | Users | Routes |
 |---|---|---|---|
-| `apps/admin` | 5173 | landlords, caretakers (`/admin/*`), super admins (`/platform/*`) | `AdminShell` (dark sidebar) |
+| `apps/admin` | 5173 | landlord staff by role (`/admin/*`), super admins (`/platform/*`) | `AdminShell` (dark sidebar) |
 | `apps/portal` | 5174 | tenants, phone-first | `TenantShell` / `TenantAuthLayout` |
 
 | Package | What's in it |
@@ -38,6 +38,11 @@ pnpm native:sync    # Capacitor: build both apps for Android/iOS and copy into a
     app calls `VITE_API_URL` directly with `Authorization: Bearer`. Admin `POST|DELETE /api/admin/auth/token`;
     tenant `POST|DELETE /api/portal/auth/token`. The token lives in the Keychain/Keystore (`secureTokenStore`).
   - The login/logout hooks branch on `api.auth`; pages never care which mode is used.
+  - **Landlord sign-up** (admin `/signup`): `useRegisterLandlord` → `POST /api/admin/auth/register` (202), then the
+    normal login. Tenants never sign up (their landlord invites them).
+  - **Continue with Google** (existing logins only): `GoogleSignInButton` (`@rentflow/native`: Google Identity
+    Services on the web, native sign-in in the apps) gives an ID token → `useAdminGoogleLogin` / `useTenantGoogleLogin`.
+    Hidden until `VITE_GOOGLE_CLIENT_ID` is set (see backend `docs/SETUP.md`).
   - `GET /api/admin/user` / `GET /api/portal/user` work in both modes. Tenant login may return
     `{ choose_home: true, homes }` (one person, several landlords) in both modes.
 - In dev, Vite proxies `/api` and `/sanctum` to `VITE_API_URL` (default `http://localhost:8000`), so the SPA
@@ -73,6 +78,9 @@ add a new component only when nothing fits, in the right folder so the next scre
 10. **App-safe layout:** fixed/sticky bars pad with `env(safe-area-inset-top|bottom)` (notches, home bar in the
     Capacitor apps); the shells already do. Native-only behaviour goes through `@rentflow/native`, never
     `Capacitor.*` calls in pages.
+11. **Auth screens** (login, sign-up, forgot password, invitation) use the `auth` tokens (`bg-auth-night`,
+    `text-auth-mint`, `font-auth` = Poppins, `ease-swap`, `animate-auth-*`) and `@rentflow/ui` auth components only.
+    Never use them inside the portals, and never the portal look on auth screens.
 
 ## PWA and the Android/iOS apps
 
@@ -97,6 +105,7 @@ add a new component only when nothing fits, in the right folder so the next scre
 | `primitives` | `Button` (`primary`, `secondary`, `outline-brand`, `danger-outline`, `ghost`, `mint`; `md`/`lg`/`xl`), `ButtonLink`, `IconButton`, `Badge` + status badges, `Card`, `Eyebrow`, `VisuallyHidden`, `StatCard`, `StatGrid`, `ProgressBar`, `TextField`, `SelectField`, `SearchInput`, `FilterChips`, `ChannelPicker`, `SegmentedControl`, `SwitchRow`, `DataTable<T>`, `SidePanel`, `BottomSheet` |
 | `layout` | `AdminShell` (+ `landlordNav`, `superAdminNav`; props `user`, `onLogout`, `accountName`, `onSwitchAccount`; top bar + menu below `md`), `PageHeader`, `Tabs`, `TenantShell` (`base`), `TenantAuthLayout`, `CaretakerHeader` |
 | `feedback` | `Notice`, `LoadingState`, `ErrorState`, `ComingSoon`, `UpdatePrompt` (PWA), `OfflineBanner` |
+| `auth` | **Auth screens only** (dark leaf design, `rentflow-auth.html`): `AuthScene` (sliding Welcome/Form panels, `mode` + `flipped`), `AuthStagger`, `AuthWelcome`, `AuthHeading`, `FloatingField` (floating label, `revealable` password, `error`), `PasswordStrength`, `AuthButton` (`loading`), `AuthCheckbox`, `AuthMeta`, `AuthFoot`, `AuthFormLayout` (`social` = "OR" column), `AuthLogo`, `authLink` |
 | `billing` | `BillLinesTable`, `BillTotals`, `BillDocument`, `DeliveryList`, `LeaseStatement`, `BillingRunsTable`, `ChargeRateCard`, `RateHistoryTable` |
 | `payments` | `PaymentsTable`, `PaymentOutcomeBadge`, `UnmatchedPaymentRow`, `RecordPaymentPanel` (live balance-after, API `errors`) |
 | `readings` | `MeterReadingCard`, `ReadingTaskLink` |
@@ -108,19 +117,40 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
 
 ## Current state
 
-- **Connected:** admin login/logout + role-based nav (caretakers: Dashboard, Meter readings, Payments),
-  Payments (list, pagination, record cash/bank/cheque), Bill detail, Billing runs (list + run now),
-  WhatsApp settings; tenant login (with "Which home?"), logout, profile.
-- **Coming soon (designed, waiting for an API):** dashboard, properties/units, tenants, meter readings
-  (incl. caretaker phone screens), bills list, team, platform/*, tenant bills/payments/M-Pesa, invitation accept.
+- **Connected:** admin login/logout, landlord sign-up, Google sign-in (both portals) + **permission-based UI** (`can()` / `useCan()` from `@rentflow/api`; nav items carry
+  `permissions`; super admins have `*`), **Team & roles** (`/admin/team`, `/admin/team/roles`), `/set-password` + real forgot password,
+  **platform** (super admin, `apps/admin/src/pages/platform`, hooks in `packages/api/src/platform.ts`): overview, landlord
+  accounts (search, create + invite owner, detail with edit / suspend / run billing, "Open account" acts inside one via
+  `X-Account-Id`, banner + Exit; `apps/admin/src/acting.ts`), billing runs (skipped leases), messaging (resend failed,
+  WhatsApp numbers), built-in roles, platform admins, activity log (`ActivityTable`); `Pager` in `@rentflow/ui`,
+  **Dashboard**, **Properties** (list, add/edit), **property units** (search, filters, add/edit unit + meters, **move-in** with
+  opening readings + emailed invitation), **Tenants** (list/search, detail with bills, payments, edit, resend invitation, move-out),
+  **Billing settings** (rate cards: change from a date, add charge / unit override, rate history, billing cycle, billing runs),
+  **Meter readings** (`/admin/readings` and the phone screen `/caretaker/readings`), Payments, Bill detail, WhatsApp settings;
+  tenant login (with "Which home?"), **accept invitation** (`/invite/:token`), logout, profile.
+- **Billing rules** mirror the backend in `packages/core/src/billing.ts` (`moveInRent`, `nextBillingDateAfter`; the move-in
+  panel previews the move-in bill with it). Change the backend's `BillingCalendar` first, then this, and both tests.
+- **Meter readings** (`/admin/readings`): Table view (`ReadingsTable`: every meter, reading date, filters, live usage via
+  `readingUsage()` in core, save all) or One by one (`MeterReadingCard`, also the caretaker phone screen); reading history +
+  correction in `panels/MeterHistoryPanel.tsx`. **Meter setup** (`/admin/properties/:id/meters`, `MeterSetupPage`): units ×
+  metered charges grid. **Getting started** checklist on the dashboard (`SetupChecklist`, `GET setup`). The move-in panel has a
+  "Already living here" mode for tenants of newly onboarded landlords (no move-in bill).
+- **Production hosting:** `../deploy/` (admin.rentflow.codepasstech.top, rentflow.codepasstech.top; nginx serves `dist/` and hands
+  `/api/` + `/sanctum/` to Laravel, so the web build keeps calling the API same-origin). Builds use `apps/*/.env.production`.
+- **Mobile:** `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
+  other columns as label / value; `Column.cardTitle | hideOnCard | cardLabel` to tune). Hand-built tables (`ReadingsTable`,
+  `BillLinesTable`, `ActivityTable`, meter setup grid) have their own phone cards. Every `PageHeader` shows `BackButton`
+  (previous page in the app, else `back` / the last breadcrumb link; `back={false}` hides it); portal pages via `PortalPage`.
+- Panels live in `apps/admin/src/panels` (property, unit + meters); API errors map onto fields with `fieldErrors()` /
+  `formMessage()` (`apps/admin/src/errors.ts`). Writes refresh all admin queries (`useAdminWrite` in `packages/api`).
+- **Bills** (`/admin/bills`: search, filters in the URL, totals, PDF download via `downloadInvoicePdf` / `api.download`, resend and
+  void panels in `apps/admin/src/panels/BillPanels.tsx`; bill page shows Messages and void details).
+- **Coming soon (designed, waiting for an API):** tenant bills/payments/M-Pesa.
 
 ## Next steps
 
-1. Wire the designed screens as the backend's admin API grows (properties, units, charge rates, tenants +
-   invitations, leases, meter readings): add hooks in `@rentflow/api`, swap `ComingSoon` for the page.
-2. Tenant portal API → `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`, accept invitation.
-3. Lease search for `RecordPaymentPanel` (replace the lease-number field) once a leases API exists.
-4. Super-admin account switcher (`X-Account-Id`).
-5. Component tests (Testing Library) for `RecordPaymentPanel` / `MeterReadingCard` live calculations.
-6. Store release: decide the domain → real app IDs + `VITE_API_URL` (https), signing keys, Play Store / App Store
+1. Tenant portal API → `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`.
+2. Lease search for `RecordPaymentPanel` (replace the lease-number field) once a leases API exists.
+3. Component tests (Testing Library) for `RecordPaymentPanel` / `MeterReadingCard` live calculations.
+4. Store release: decide the domain → real app IDs + `VITE_API_URL` (https), signing keys, Play Store / App Store
    listings; deep links for tenant invitations (`/invite/:token`); push notifications for new bills.

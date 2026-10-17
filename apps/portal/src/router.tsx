@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PortalLayout, PortalPage, SoonCard } from './PortalLayout';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -8,14 +9,7 @@ import { ProfilePage } from './pages/ProfilePage';
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/invite/:token', element: <AcceptInvitePage /> },
-  {
-    path: '/forgot-password',
-    element: (
-      <main className="mx-auto max-w-[480px] px-4 py-12">
-        <SoonCard title="Forgot your password?">Password reset is coming soon. Ask your landlord or caretaker to send you a new invitation link.</SoonCard>
-      </main>
-    ),
-  },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
     path: '/',
     element: <PortalLayout />,

@@ -5,8 +5,11 @@ import { RouterProvider } from 'react-router-dom';
 import { ApiProvider } from '@rentflow/api';
 import '@rentflow/ui/styles.css';
 import { api, queryClient } from './api';
+import { restoreActingAccount } from './acting';
 import { AppChrome } from './AppChrome';
 import { router } from './router';
+
+restoreActingAccount();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

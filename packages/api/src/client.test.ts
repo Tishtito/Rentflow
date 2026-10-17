@@ -135,4 +135,21 @@ describe('api client (Sanctum SPA auth)', () => {
       expect(() => createApiClient({ auth: 'token' })).toThrow(/tokenStore/);
     });
   });
+
+  it('downloads files with the token and account headers, and turns errors into ApiError', async () => {
+    const fetch = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+      String(url).includes('/404/') ? json(404, { message: 'Not found.' }) : new Response('%PDF-1.7', { status: 200, headers: { 'Content-Type': 'application/pdf' } }),
+    );
+    const store = { get: async () => 'tok-1', set: async () => {}, clear: async () => {} };
+    const api = createApiClient({ fetch, auth: 'token', tokenStore: store });
+    api.setAccountId(7);
+
+    const blob = await api.download('/api/admin/invoices/1/pdf');
+    expect(blob.size).toBe(8);
+    const headers = (fetch.mock.calls[0]![1] as RequestInit).headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok-1');
+    expect(headers['X-Account-Id']).toBe('7');
+
+    await expect(api.download('/api/admin/invoices/404/pdf')).rejects.toBeInstanceOf(ApiError);
+  });
 });

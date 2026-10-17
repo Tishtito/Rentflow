@@ -5,3 +5,6 @@ export * from './DataTable';
 export * from './Form';
 export * from './Overlay';
 export * from './StatCard';
+export * from './Pager';
+export * from './RowActions';
+export * from './BackButton';

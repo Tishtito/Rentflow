@@ -1,5 +1,5 @@
 import { RequireAuth, useTenant } from '@rentflow/api';
-import { LoadingState, TenantShell } from '@rentflow/ui';
+import { BackButton, LoadingState, TenantShell } from '@rentflow/ui';
 
 /** Logged-in frame: phone-first column + bottom tabs. */
 export function PortalLayout() {
@@ -21,10 +21,12 @@ export function SoonCard({ title, children }: { title: string; children?: React.
   );
 }
 
-export function PortalPage({ title, children }: { title: string; children: React.ReactNode }) {
+/** A portal page with its title and a Back button (previous page, else `back`, default home). */
+export function PortalPage({ title, back = '/', children }: { title: string; back?: string | false; children: React.ReactNode }) {
   return (
     <>
-      <header className="px-5 pb-2 pt-6">
+      <header className="flex flex-col gap-1 px-5 pb-2 pt-4">
+        {back !== false && <BackButton fallback={back} />}
         <h1 className="m-0 font-display text-[26px] font-bold">{title}</h1>
       </header>
       <div className="flex flex-col gap-4 px-4 pt-3">{children}</div>

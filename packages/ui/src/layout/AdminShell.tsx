@@ -23,26 +23,30 @@ export interface NavItem {
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   badge?: number; // e.g. unmatched payments
   end?: boolean;
+  /** Shown only to users with ANY of these permissions (the app filters with can()). */
+  permissions?: string[];
 }
 
 export const landlordNav: NavItem[] = [
-  { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
-  { to: '/admin/properties', label: 'Properties & units', icon: HomeIcon },
-  { to: '/admin/tenants', label: 'Tenants', icon: PersonIcon },
-  { to: '/admin/readings', label: 'Meter readings', icon: GaugeIcon },
-  { to: '/admin/bills', label: 'Bills', icon: ReceiptIcon },
-  { to: '/admin/payments', label: 'Payments', icon: CardIcon },
-  { to: '/admin/settings/billing', label: 'Billing settings', icon: SlidersIcon },
-  { to: '/admin/settings/whatsapp', label: 'WhatsApp', icon: BellIcon },
-  { to: '/admin/team', label: 'Team & caretakers', icon: TeamIcon },
+  { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true, permissions: ['dashboard.view'] },
+  { to: '/admin/properties', label: 'Properties & units', icon: HomeIcon, permissions: ['properties.view'] },
+  { to: '/admin/tenants', label: 'Tenants', icon: PersonIcon, permissions: ['tenants.view'] },
+  { to: '/admin/readings', label: 'Meter readings', icon: GaugeIcon, permissions: ['readings.view'] },
+  { to: '/admin/bills', label: 'Bills', icon: ReceiptIcon, permissions: ['invoices.view'] },
+  { to: '/admin/payments', label: 'Payments', icon: CardIcon, permissions: ['payments.view'] },
+  { to: '/admin/settings/billing', label: 'Billing settings', icon: SlidersIcon, permissions: ['rates.view', 'billing.view', 'settings.billing'] },
+  { to: '/admin/settings/whatsapp', label: 'WhatsApp', icon: BellIcon, permissions: ['whatsapp.manage'] },
+  { to: '/admin/team', label: 'Team & roles', icon: TeamIcon, permissions: ['team.view'] },
 ];
 
 export const superAdminNav: NavItem[] = [
-  { to: '/platform', label: 'Platform overview', end: true },
-  { to: '/platform/accounts', label: 'Landlord accounts' },
-  { to: '/platform/billing-runs', label: 'Billing runs' },
-  { to: '/platform/messaging', label: 'Messaging & delivery' },
-  { to: '/platform/admins', label: 'Platform admins' },
+  { to: '/platform', label: 'Platform overview', icon: DashboardIcon, end: true },
+  { to: '/platform/accounts', label: 'Landlord accounts', icon: HomeIcon },
+  { to: '/platform/billing-runs', label: 'Billing runs', icon: ReceiptIcon },
+  { to: '/platform/messaging', label: 'Messaging & delivery', icon: BellIcon },
+  { to: '/platform/roles', label: 'Built-in roles', icon: SlidersIcon },
+  { to: '/platform/admins', label: 'Platform admins', icon: TeamIcon },
+  { to: '/platform/activity', label: 'Activity log', icon: PersonIcon },
 ];
 
 /**

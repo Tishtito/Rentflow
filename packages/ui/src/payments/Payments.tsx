@@ -8,6 +8,8 @@ import { Button } from '../primitives/Button';
 import { DataTable, type Column } from '../primitives/DataTable';
 import { ChannelPicker, SegmentedControl, TextField } from '../primitives/Form';
 import { SidePanel } from '../primitives/Overlay';
+import { actionsColumn } from '../primitives/RowActions';
+import { EyeIcon } from '../icons';
 
 /** Outcome pill: "Paid in full" · "Part · 15,350 left" · "Overpaid · 500 credit" · "Reversed". */
 export function PaymentOutcomeBadge({ payment }: { payment: Payment }) {
@@ -58,6 +60,7 @@ export function PaymentsTable({ payments, invoiceHref }: { payments: Payment[]; 
         <span className={cn('font-semibold', p.status === 'reversed' && 'text-muted line-through')}>{formatAmount(p.amount)}</span>
       ),
     },
+    actionsColumn<Payment>((p) => [{ label: `View bill ${p.invoice_number ?? ''}`.trim(), icon: EyeIcon, to: invoiceHref(p), hidden: !p.invoice_number }]),
     { key: 'status', header: 'Status', cell: (p) => <PaymentOutcomeBadge payment={p} /> },
   ];
   return <DataTable caption="Payments" columns={columns} rows={payments} rowKey={(p) => p.id} empty="No payments in this period." />;

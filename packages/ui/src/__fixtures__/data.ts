@@ -12,7 +12,7 @@ import type {
   UnmatchedMpesaPayment,
 } from '@rentflow/core';
 
-export const account = { name: 'Kims Properties Ltd', paybill: '[YOUR PAYBILL]', cycleDays: 29 };
+export const account = { name: 'Kims Properties Ltd', paybill: '[YOUR PAYBILL]', billingDay: 5 };
 export const currentUser = { name: 'Kim Wanjiru', roleLabel: 'Landlord', initials: 'KW' };
 
 export const invoice7_7: Invoice = {
