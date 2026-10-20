@@ -1,14 +1,30 @@
+import { useId } from 'react';
+import { CalendarClock, Download, Droplet, House, Info, KeyRound, Receipt, Trash2, Zap } from 'lucide-react';
 import { cn } from '@rentflow/core';
-import { formatAmount, formatDate, formatKES, formatPeriod, formatQuantity, methodLabel, toCents } from '@rentflow/core';
-import type { Invoice, Payment } from '@rentflow/core';
-import { Badge } from '../primitives/Badge';
-import { Button } from '../primitives/Button';
+import { formatAmount, formatDate, formatPeriod, formatQuantity, methodLabel, toCents } from '@rentflow/core';
+import type { Invoice, Payment, TenantPayment } from '@rentflow/core';
 import { ChevronRightIcon } from '../icons';
+import { GlassButton, GlassCard, LineItemRow, StatusPill, type GlassIcon } from '../portal/Glass';
 
-/** Dark hero card: what the tenant owes now, with the pay button. */
+/** Small glass chip under the hero amount ("This bill 18,500"). */
+function StatChip({ label, value, tone }: { label: string; value: string; tone?: 'amber' }) {
+  return (
+    <span className="glass inline-flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-none">
+      <span className="text-glass-muted">{label}</span>
+      <span className={cn('num font-semibold', tone === 'amber' ? 'text-glass-amber' : 'text-glass-text')}>{value}</span>
+    </span>
+  );
+}
+
+/**
+ * Hero glass card: what the tenant owes now (the lease balance), the bill's due date (coral when
+ * overdue), this bill / arrears / paid-so-far chips, and the pay button. Without `onPay` (no M-Pesa
+ * yet) it says to pay the landlord as usual. `home` labels the card when the tenant has more than one.
+ */
 export function AmountDueCard({
   invoice,
   balance,
+  home,
   paybill,
   accountRef,
   onPay,
@@ -16,89 +32,123 @@ export function AmountDueCard({
 }: {
   invoice: Invoice;
   balance: string; // lease balance (may differ from invoice total after part payments)
-  paybill: string;
-  accountRef: string;
-  onPay: () => void; // M-Pesa STK push
+  home?: string; // "House 7-7, Kims Apartments"
+  paybill?: string;
+  accountRef?: string;
+  onPay?: () => void; // M-Pesa STK push
   paying?: boolean;
 }) {
+  const id = useId();
   const arrears = toCents(invoice.balance_brought_forward);
   const settled = toCents(balance) <= 0;
   return (
-    <section aria-labelledby="due-h" className="flex flex-col gap-4 rounded-[20px] bg-nav p-[22px] text-white">
-      <div className="flex items-center justify-between">
-        <h2 id="due-h" className="m-0 text-sm font-medium text-nav-text">
+    <GlassCard strong aria-labelledby={id} className="relative flex flex-col gap-4 overflow-hidden p-[22px]">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-glass-sage/25 blur-3xl" />
+      <div className="relative flex items-start justify-between gap-3">
+        <h2 id={id} className="m-0 flex flex-col gap-0.5 text-sm font-medium text-glass-muted">
           {settled ? 'All paid up' : 'Amount due'}
+          {home && <span className="text-xs font-normal">{home}</span>}
         </h2>
-        {!settled && <Badge tone="gold" className="font-bold">Due {formatDate(invoice.due_date)}</Badge>}
+        {settled ? (
+          <StatusPill tone="sage">Paid</StatusPill>
+        ) : (
+          <StatusPill tone={invoice.status === 'overdue' ? 'coral' : 'amber'}>
+            {invoice.status === 'overdue' ? `Overdue · was due ${formatDate(invoice.due_date)}` : `Due ${formatDate(invoice.due_date)}`}
+          </StatusPill>
+        )}
       </div>
-      <span className="num font-display text-[42px] font-bold leading-none">{formatKES(Math.max(0, toCents(balance) / 100))}</span>
+      <p className="relative m-0 flex items-baseline gap-2">
+        <span className="text-base font-medium text-glass-muted">KES</span>
+        <span className="num text-[42px] font-semibold leading-none tracking-tight">{formatAmount(Math.max(0, toCents(balance) / 100))}</span>
+      </p>
       {!settled && (
-        <span className="num text-sm text-nav-text">
-          {arrears > 0
-            ? `This bill ${formatAmount(invoice.current_charges)} + arrears ${formatAmount(invoice.balance_brought_forward)}`
-            : `This bill ${formatAmount(invoice.current_charges)}`}
-        </span>
+        <div className="relative flex flex-wrap gap-2">
+          <StatChip label="This bill" value={formatAmount(invoice.current_charges)} />
+          {arrears !== 0 && <StatChip label="Arrears" value={formatAmount(invoice.balance_brought_forward)} tone="amber" />}
+          {toCents(invoice.amount_paid) > 0 && <StatChip label="Paid so far" value={formatAmount(invoice.amount_paid)} />}
+        </div>
       )}
-      {!settled && (
-        <>
-          <Button variant="mint" size="xl" onClick={onPay} disabled={paying}>
-            {paying ? 'Check your phone…' : 'Pay with M-Pesa'}
-          </Button>
-          <span className="text-center text-[13px] text-nav-text">
-            Or Paybill {paybill} · Account {accountRef}
-          </span>
-        </>
-      )}
-    </section>
-  );
-}
-
-/** Bill breakdown for the tenant, readings shown under each metered line. */
-export function TenantBillCard({ invoice, onDownload }: { invoice: Invoice; onDownload?: () => void }) {
-  const month = new Date(`${invoice.period_end}T00:00:00+03:00`).toLocaleDateString('en-GB', { month: 'long' });
-  const row = 'num flex items-center justify-between border-b border-line-soft py-3 text-[15px]';
-  return (
-    <section aria-labelledby="bill-h" className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-5">
-      <div className="flex items-baseline justify-between pb-2">
-        <h2 id="bill-h" className="m-0 text-[17px] font-semibold">
-          {month} bill
-        </h2>
-        <span className="text-[13px] text-muted">{formatPeriod(invoice.period_start, invoice.period_end).replace(/ \d{4}$/, '')}</span>
-      </div>
-      {(invoice.items ?? []).map((it) => (
-        <div key={`${it.charge_code}-${it.description}`} className={row}>
-          <span className="flex flex-col gap-0.5">
-            {it.description}
-            {it.previous_reading !== null && (
-              <span className="text-xs text-muted">
-                {formatQuantity(it.previous_reading)} → {formatQuantity(it.current_reading!)} · {formatQuantity(it.quantity)}
-                {it.unit_of_measure ? ` ${it.unit_of_measure}` : ''} × {formatAmount(it.rate)}
+      {!settled &&
+        (onPay ? (
+          <>
+            <GlassButton onClick={onPay} loading={paying} className="relative w-full">
+              {paying ? 'Check your phone…' : 'Pay with M-Pesa'}
+            </GlassButton>
+            {paybill && (
+              <span className="relative text-center text-[13px] text-glass-muted">
+                Or Paybill {paybill} · Account {accountRef}
               </span>
             )}
-          </span>
-          <span>{formatAmount(it.amount)}</span>
-        </div>
-      ))}
-      {toCents(invoice.balance_brought_forward) !== 0 && (
-        <div className={cn(row, 'text-warn-strong')}>
-          <span>Arrears</span>
-          <span>{formatAmount(invoice.balance_brought_forward)}</span>
-        </div>
-      )}
-      <div className="num flex justify-between pb-1 pt-3.5 text-base font-bold">
-        <span>Total</span>
-        <span>{formatKES(invoice.total_due)}</span>
-      </div>
-      {onDownload && (
-        <button type="button" onClick={onDownload} className="inline-flex min-h-touch items-center self-start text-sm font-medium text-brand">
-          Download PDF
-        </button>
-      )}
-    </section>
+          </>
+        ) : (
+          <p className="relative m-0 flex gap-2 text-[13px] leading-snug text-glass-muted">
+            <Info size={16} strokeWidth={1.75} className="mt-px shrink-0" aria-hidden="true" />
+            Pay your landlord the usual way; payments show here once they record them.
+          </p>
+        ))}
+    </GlassCard>
   );
 }
 
-export function PaymentHistoryList({ payments }: { payments: Payment[] }) {
+/** Line icons by charge code (anything else: a receipt). */
+const chargeIcon: Record<string, GlassIcon> = {
+  rent: House,
+  electricity: Zap,
+  water: Droplet,
+  garbage: Trash2,
+  deposit: KeyRound,
+};
+
+/** Bill breakdown for the tenant: icon per line, readings under metered lines, arrears in amber, serif total. */
+export function TenantBillCard({ invoice, onDownload }: { invoice: Invoice; onDownload?: () => void }) {
+  // Named for the month the period starts: the 5 Nov – 4 Dec bill is the November bill.
+  const month = new Date(`${invoice.period_start}T00:00:00+03:00`).toLocaleDateString('en-GB', { month: 'long' });
+  const id = useId();
+  return (
+    <GlassCard aria-labelledby={id} className="flex flex-col p-5">
+      <div className="flex items-baseline justify-between gap-3 pb-1">
+        <h2 id={id} className="m-0 text-[17px] font-semibold">
+          {month} bill
+        </h2>
+        <span className="text-[13px] text-glass-muted">{formatPeriod(invoice.period_start, invoice.period_end).replace(/ \d{4}$/, '')}</span>
+      </div>
+      {(invoice.items ?? []).map((it) => (
+        <LineItemRow
+          key={`${it.charge_code}-${it.description}`}
+          icon={chargeIcon[it.charge_code] ?? Receipt}
+          label={it.description}
+          sub={
+            it.previous_reading !== null && (
+              <>
+                {formatQuantity(it.previous_reading)} → {formatQuantity(it.current_reading!)} · {formatQuantity(it.quantity)}
+                {it.unit_of_measure ? ` ${it.unit_of_measure}` : ''} × {formatAmount(it.rate)}
+              </>
+            )
+          }
+          amount={formatAmount(it.amount)}
+        />
+      ))}
+      {toCents(invoice.balance_brought_forward) !== 0 && (
+        <LineItemRow icon={CalendarClock} label="Arrears" amount={formatAmount(invoice.balance_brought_forward)} tone="amber" />
+      )}
+      <div className="mt-1 flex items-baseline justify-between border-0 border-t border-solid border-glass-strong pt-4">
+        <span className="text-[15px] font-semibold">Total</span>
+        <span className="num font-serif text-[22px] font-semibold">
+          <span className="mr-1.5 font-inter text-sm font-medium text-glass-muted">KES</span>
+          {formatAmount(invoice.total_due)}
+        </span>
+      </div>
+      {onDownload && (
+        <GlassButton variant="glass" onClick={onDownload} className="mt-4 self-start shadow-none">
+          <Download size={18} strokeWidth={1.75} aria-hidden="true" />
+          Download PDF
+        </GlassButton>
+      )}
+    </GlassCard>
+  );
+}
+
+export function PaymentHistoryList({ payments }: { payments: Array<Payment | TenantPayment> }) {
   return (
     <ul className="m-0 list-none p-0">
       {payments.map((p, i) => (

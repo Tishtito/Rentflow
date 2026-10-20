@@ -57,12 +57,33 @@ export const colors = {
     error: '#FF6B6B',
     amber: '#F5B942', // password strength "fair"
   },
+
+  // Tenant portal only: "dark botanical glass" (forest gradient, frosted cards, sage accent).
+  // Text on these passes 4.5:1 on the glass over the gradient; `solid` replaces glass without backdrop blur.
+  glass: {
+    night: '#0F1F17', // gradient start, page background
+    forest: '#1B2E23', // gradient end
+    solid: '#22382C', // card when blur isn't available or reduced transparency is on
+    fill: 'rgba(255, 255, 255, 0.08)', // card
+    raised: 'rgba(255, 255, 255, 0.12)', // hero card, pressed rows
+    edge: 'rgba(255, 255, 255, 0.14)', // card border
+    line: 'rgba(255, 255, 255, 0.08)', // dividers
+    strong: 'rgba(255, 255, 255, 0.18)', // total row divider
+    glow: 'rgba(168, 200, 160, 0.15)', // background blobs
+    text: '#F1F5EE',
+    muted: 'rgba(241, 245, 238, 0.66)', // secondary text
+    sage: { DEFAULT: '#A8C8A0', ink: '#14261B', soft: 'rgba(168, 200, 160, 0.15)' }, // accent, paid, active tab
+    amber: { DEFAULT: '#F2C879', soft: 'rgba(242, 200, 121, 0.15)' }, // due, arrears
+    coral: { DEFAULT: '#F2A07B', soft: 'rgba(242, 160, 123, 0.15)' }, // overdue, errors, log out
+  },
 };
 
 export const fonts = {
   display: ['"Bricolage Grotesque"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
   sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
   auth: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'], // auth screens only
+  serif: ['Fraunces', 'ui-serif', 'Georgia', 'serif'], // tenant portal headings
+  inter: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], // tenant portal UI text
 };
 
 export const radii = {
@@ -71,4 +92,6 @@ export const radii = {
   lg: '14px', // cards
   xl: '18px', // tenant portal cards
   '2xl': '22px', // bottom sheets, hero card
+  glass: '24px', // tenant portal cards
+  bar: '28px', // tenant portal tab bar
 };

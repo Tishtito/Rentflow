@@ -533,6 +533,39 @@ export interface PortalTenant {
   account: { id: number; name: string | null };
 }
 
+/** One home on GET /api/portal/home: a current lease (or the last one after moving out). */
+export interface PortalHomeEntry {
+  lease_id: number;
+  unit_number: string | null;
+  property_name: string | null;
+  lease_status: LeaseStatus;
+  start_date: ISODate;
+  monthly_rent: Money;
+  next_billing_date: ISODate | null;
+  /** Running balance: positive = owes, negative = credit. */
+  balance: Money;
+  /** With its items; null before the first bill. */
+  latest_invoice: Invoice | null;
+}
+
+/** A payment as the tenant sees it (no landlord notes). */
+export interface TenantPayment {
+  id: number;
+  lease_id: number;
+  invoice_id: number | null;
+  amount: Money;
+  method: PaymentMethod;
+  reference: string | null;
+  paid_at: ISODateTime;
+  invoice_number?: string | null;
+}
+
+/** GET /api/portal/home */
+export interface PortalHome {
+  homes: PortalHomeEntry[];
+  recent_payments: TenantPayment[];
+}
+
 /** POST /api/portal/auth/login: logged in, or several landlords matched and the person must choose. */
 export type PortalLoginResult =
   | { choose_home: false; tenant: PortalTenant }

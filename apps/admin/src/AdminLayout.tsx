@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { RequireAuth, useAdminLogout, useAdminUser } from '@rentflow/api';
 import type { AuthUser } from '@rentflow/core';
-import { AdminShell, LoadingState, superAdminNav } from '@rentflow/ui';
+import { AdminShell, BottomNav, LoadingState, landlordTabs, superAdminNav } from '@rentflow/ui';
 import { actingAccount, setActingAccount } from './acting';
 import { allowedNav, initials, roleLabel } from './session';
 
@@ -43,6 +43,7 @@ export function AdminLayout({ variant }: { variant: 'landlord' | 'super' }) {
             variant={variant}
             accountName={variant === 'landlord' && session.data.role === 'super_admin' ? acting?.name : undefined}
             nav={variant === 'super' ? superAdminNav : allowedNav(session.data)}
+            bottomNav={variant === 'landlord' ? <BottomNav tabs={landlordTabs} allowed={allowedNav(session.data)} /> : undefined}
             user={{ name: session.data.name, roleLabel: roleLabel(session.data), initials: initials(session.data.name) }}
             onLogout={() =>
               logout.mutate(undefined, {

@@ -27,8 +27,8 @@ export default defineConfig(({ mode }) => {
           scope: '/',
           display: 'standalone',
           orientation: 'portrait',
-          theme_color: '#1D5A44',
-          background_color: '#F4F5F1',
+          theme_color: '#0F1F17',
+          background_color: '#0F1F17',
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],

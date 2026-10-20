@@ -78,9 +78,18 @@ add a new component only when nothing fits, in the right folder so the next scre
 10. **App-safe layout:** fixed/sticky bars pad with `env(safe-area-inset-top|bottom)` (notches, home bar in the
     Capacitor apps); the shells already do. Native-only behaviour goes through `@rentflow/native`, never
     `Capacitor.*` calls in pages.
-11. **Auth screens** (login, sign-up, forgot password, invitation) use the `auth` tokens (`bg-auth-night`,
+11. **Admin auth screens** (login, sign-up, forgot password, set password) use the `auth` tokens (`bg-auth-night`,
     `text-auth-mint`, `font-auth` = Poppins, `ease-swap`, `animate-auth-*`) and `@rentflow/ui` auth components only.
-    Never use them inside the portals, and never the portal look on auth screens.
+    Never use them inside the admin app's pages. The **tenant portal's** auth screens use `GlassAuthLayout` instead (below).
+12. **Tenant portal = "dark botanical glass"**, portal only: `glass` tokens (`bg-glass-fill`, `text-glass-muted`,
+    `text-glass-sage`, `bg-glass-amber-soft`…), `font-serif` (Fraunces) headings + `font-inter` text, `rounded-glass` /
+    `rounded-bar`, `shadow-glass`; surfaces via the `glass` / `glass-strong` / `glass-bg` / `glass-skeleton` classes in
+    `packages/ui/src/styles/portal.css` (imported by the portal only; solid fallbacks for no blur and reduced
+    transparency). Build portal screens from `packages/ui/src/portal/` (`GlassCard`, `StatusPill` / `InvoicePill`,
+    `IconCircle`, `LineItemRow`, `ListRow`, `PortalHeader`, `FloatingTabBar`, `GlassButton`, `GlassLoading`, `GlassError`,
+    `GlassEmpty`, `GlassPager`, `GlassAvatar`; auth: `GlassAuthLayout` (login photos in `apps/portal/public/login/`,
+    portrait below `md`, landscape from `md`), `GlassField`, `GlassCheckbox`, `GlassFormAlert`, `glassLink`). Icons there
+    are Lucide (`lucide-react`, stroke 1.75); the admin keeps `icons.tsx`. Tab roots have no Back; detail pages do.
 
 ## PWA and the Android/iOS apps
 
@@ -88,6 +97,11 @@ add a new component only when nothing fits, in the right folder so the next scre
   (`pwa-assets.config.ts`), Workbox service worker that precaches the app shell (works offline) and caches
   Google Fonts. **API responses are never cached** (personal data, shared phones). `registerType: 'prompt'`:
   `AppChrome` shows `UpdatePrompt` when a new version is deployed. `OfflineBanner` shows while offline.
+- **Install pop-up** (`InstallPrompt` in `@rentflow/ui`, `look="glass"` in the portal / `"light"` in admin; state from
+  `useInstallPrompt` in `@rentflow/native`, rules in `installMode` in `@rentflow/core`): on every visit ~2 s after load,
+  until installed. Chrome/Edge/Android: "Install" opens the browser's dialog (`beforeinstallprompt`); iPhone/iPad: Share →
+  Add to Home Screen steps. Never in the Capacitor apps, when already installed, or after "Not now"/Esc in that tab
+  (`sessionStorage`); hidden while `UpdatePrompt` shows. Test with `pnpm build` + `vite preview` (no service worker in dev).
 - **Capacitor** (`apps/*/capacitor.config.ts`, `android/`, `ios/`): `pnpm build:native` = `vite build --mode native`
   (no service worker; `.env.native` sets `VITE_API_URL`), `pnpm cap:sync` copies it into the native projects.
   - App IDs `com.codepasstech.rentflow.tenant` / `.admin` are **placeholders** (no domain yet): change `appId` in
@@ -103,14 +117,15 @@ add a new component only when nothing fits, in the right folder so the next scre
 | Folder | Components |
 |---|---|
 | `primitives` | `Button` (`primary`, `secondary`, `outline-brand`, `danger-outline`, `ghost`, `mint`; `md`/`lg`/`xl`), `ButtonLink`, `IconButton`, `Badge` + status badges, `Card`, `Eyebrow`, `VisuallyHidden`, `StatCard`, `StatGrid`, `ProgressBar`, `TextField`, `SelectField`, `SearchInput`, `FilterChips`, `ChannelPicker`, `SegmentedControl`, `SwitchRow`, `DataTable<T>`, `SidePanel`, `BottomSheet` |
-| `layout` | `AdminShell` (+ `landlordNav`, `superAdminNav`; props `user`, `onLogout`, `accountName`, `onSwitchAccount`; top bar + menu below `md`), `PageHeader`, `Tabs`, `TenantShell` (`base`), `TenantAuthLayout`, `CaretakerHeader` |
+| `layout` | `AdminShell` (+ `landlordNav`, `superAdminNav`; props `user`, `onLogout`, `accountName`, `onSwitchAccount`, `bottomNav`; top bar + menu below `md`), `BottomNav` (+ `landlordTabs`), `PageHeader`, `Tabs`, `TenantShell` (`base`), `TenantAuthLayout`, `CaretakerHeader` |
 | `feedback` | `Notice`, `LoadingState`, `ErrorState`, `ComingSoon`, `UpdatePrompt` (PWA), `OfflineBanner` |
 | `auth` | **Auth screens only** (dark leaf design, `rentflow-auth.html`): `AuthScene` (sliding Welcome/Form panels, `mode` + `flipped`), `AuthStagger`, `AuthWelcome`, `AuthHeading`, `FloatingField` (floating label, `revealable` password, `error`), `PasswordStrength`, `AuthButton` (`loading`), `AuthCheckbox`, `AuthMeta`, `AuthFoot`, `AuthFormLayout` (`social` = "OR" column), `AuthLogo`, `authLink` |
 | `billing` | `BillLinesTable`, `BillTotals`, `BillDocument`, `DeliveryList`, `LeaseStatement`, `BillingRunsTable`, `ChargeRateCard`, `RateHistoryTable` |
 | `payments` | `PaymentsTable`, `PaymentOutcomeBadge`, `UnmatchedPaymentRow`, `RecordPaymentPanel` (live balance-after, API `errors`) |
 | `readings` | `MeterReadingCard`, `ReadingTaskLink` |
 | `dashboard` | `AttentionPanel`, `AttentionItem`, `CollectionBars`, `AmountRow` |
-| `tenant` | `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`, `HomeChoiceList` |
+| `tenant` | `AmountDueCard`, `TenantBillCard` (glass, portal), `PaymentHistoryList` (admin), `HomeChoiceList` |
+| `portal` | Tenant portal glass kit, see design rule 12 |
 | `units` | `MoveInPanel` |
 
 Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
@@ -137,7 +152,8 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
   "Already living here" mode for tenants of newly onboarded landlords (no move-in bill).
 - **Production hosting:** `deploy/` (`deploy.sh` builds + uploads both apps, nginx sites; server/DNS/API setup is in `../backend/deploy/`) (admin.rentflow.codepasstech.top, rentflow.codepasstech.top; nginx serves `dist/` and hands
   `/api/` + `/sanctum/` to Laravel, so the web build keeps calling the API same-origin). Builds use `apps/*/.env.production`.
-- **Mobile:** `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
+- **Mobile:** phones (below `md`) get `BottomNav` in the admin app: Properties, Tenants, a raised Dashboard button in a
+  notch, Meters, Bills (only the tabs `allowedNav` allows; everything stays in the top bar's menu too). `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
   other columns as label / value; `Column.cardTitle | hideOnCard | cardLabel` to tune). Hand-built tables (`ReadingsTable`,
   `BillLinesTable`, `ActivityTable`, meter setup grid) have their own phone cards. Every `PageHeader` shows `BackButton`
   (previous page in the app, else `back` / the last breadcrumb link; `back={false}` hides it); portal pages via `PortalPage`.
@@ -145,11 +161,15 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
   `formMessage()` (`apps/admin/src/errors.ts`). Writes refresh all admin queries (`useAdminWrite` in `packages/api`).
 - **Bills** (`/admin/bills`: search, filters in the URL, totals, PDF download via `downloadInvoicePdf` / `api.download`, resend and
   void panels in `apps/admin/src/panels/BillPanels.tsx`; bill page shows Messages and void details).
-- **Coming soon (designed, waiting for an API):** tenant bills/payments/M-Pesa.
+- **Tenant portal after login:** home (`AmountDueCard` per home, latest `TenantBillCard` + PDF, recent payments), `/bills`,
+  `/bills/:id`, `/payments` (`usePortalHome` / `usePortalInvoices` / `usePortalInvoice` / `usePortalPayments`,
+  `downloadPortalInvoicePdf`). `AmountDueCard` hides the pay button until M-Pesa exists (no `onPay`). Bills are named for
+  the month their period starts (the 5 Nov – 4 Dec bill is the November bill).
+- **Coming soon (designed, waiting for an API):** M-Pesa payments from the portal.
 
 ## Next steps
 
-1. Tenant portal API → `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`.
+1. M-Pesa STK push from `AmountDueCard` (`onPay`, `paybill`, `accountRef`) once the backend has it.
 2. Lease search for `RecordPaymentPanel` (replace the lease-number field) once a leases API exists.
 3. Component tests (Testing Library) for `RecordPaymentPanel` / `MeterReadingCard` live calculations.
 4. Store release: decide the domain → real app IDs + `VITE_API_URL` (https), signing keys, Play Store / App Store

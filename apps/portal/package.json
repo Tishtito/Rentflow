@@ -30,6 +30,7 @@
     "@rentflow/native": "workspace:*",
     "@rentflow/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.2",
+    "lucide-react": "^1.60.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1"

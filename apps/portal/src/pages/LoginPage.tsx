@@ -4,23 +4,20 @@ import type { PortalLoginResult } from '@rentflow/core';
 import { ApiError, useApi, useTenant, useTenantGoogleLogin, useTenantLogin } from '@rentflow/api';
 import { GoogleSignInButton } from '@rentflow/native';
 import {
-  AuthButton,
-  AuthCheckbox,
-  AuthFoot,
-  AuthFormLayout,
-  AuthHeading,
-  AuthMeta,
-  AuthScene,
-  AuthStagger,
-  AuthWelcome,
   BottomSheet,
-  FloatingField,
+  GlassAuthHeading,
+  GlassAuthLayout,
+  GlassButton,
+  GlassCheckbox,
+  GlassField,
+  GlassFormAlert,
+  GlassLoading,
   HomeChoiceList,
-  LoadingState,
   Notice,
-  authLink,
+  glassLink,
 } from '@rentflow/ui';
 import { googleClientIds } from '../google';
+import { authPhotos } from '../PortalLayout';
 
 type Mode = 'login' | 'invite';
 
@@ -30,7 +27,7 @@ const focusFirstInvalid = (form: HTMLFormElement) =>
 
 /**
  * Tenant log in: email OR national ID + password, or Google. Tenants don't sign up (their landlord
- * invites them), so the other side explains the invitation. If the login matches tenants under
+ * invites them), so "Use your invitation" explains how they join. If the login matches tenants under
  * several landlords, the "Which home?" sheet asks which one.
  */
 export function LoginPage() {
@@ -38,47 +35,19 @@ export function LoginPage() {
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/';
   const [mode, setMode] = useState<Mode>('login');
 
-  if (session.isPending) return <LoadingState className="min-h-screen bg-auth-night text-auth-muted" />;
+  if (session.isPending)
+    return (
+      <div className="glass-bg px-5 pt-24">
+        <GlassLoading rows={1} />
+      </div>
+    );
   // Also runs right after a successful login (the mutation stores the tenant), so honour `from` here.
   if (session.data) return <Navigate to={from} replace />;
 
   return (
-    <AuthScene<Mode>
-      mode={mode}
-      flipped={(m) => m === 'login'}
-      announce={(m) => (m === 'login' ? 'Log in form shown' : 'Invitation help shown')}
-      welcome={{
-        login: (
-          <AuthWelcome
-            title={
-              <>
-                Welcome
-                <br />
-                Back
-              </>
-            }
-            text="See your bill, balance and payments for your home."
-            switchText="New here?"
-            switchLabel="Got an invitation?"
-            onSwitch={() => setMode('invite')}
-            features={['Your bills', 'Payments', 'Always synced']}
-          />
-        ),
-        invite: (
-          <AuthWelcome
-            title="Karibu!"
-            text="Your landlord adds you to Rentflow and sends you an invitation link by SMS, WhatsApp or email."
-            switchText="Already set your password?"
-            switchLabel="Log In"
-            onSwitch={() => setMode('login')}
-          />
-        ),
-      }}
-      form={{
-        login: <LoginForm onInvite={() => setMode('invite')} />,
-        invite: <InviteHelp onLogIn={() => setMode('login')} />,
-      }}
-    />
+    <GlassAuthLayout photos={authPhotos} tagline="Your bill, balance and payments">
+      <div aria-live="polite">{mode === 'login' ? <LoginForm onInvite={() => setMode('invite')} /> : <InviteHelp onLogIn={() => setMode('login')} />}</div>
+    </GlassAuthLayout>
   );
 }
 
@@ -134,9 +103,48 @@ function LoginForm({ onInvite }: { onInvite: () => void }) {
   };
 
   return (
-    <AuthFormLayout
-      social={
-        googleClientIds && (
+    <>
+      <form noValidate onSubmit={submit}>
+        <GlassAuthHeading title="Log in" subtitle="Good to see you again" />
+        {formMessage && <GlassFormAlert>{formMessage}</GlassFormAlert>}
+        <GlassField
+          label="Email or National ID"
+          autoComplete="username"
+          value={identifier}
+          onChange={(e) => {
+            setIdentifier(e.target.value);
+            setErrors((x) => ({ ...x, identifier: '' }));
+          }}
+          error={errors.identifier || (pending.kind === 'password' && !homes ? apiError?.field('identifier') : undefined)}
+        />
+        <GlassField
+          label="Password"
+          type="password"
+          revealable
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setErrors((x) => ({ ...x, password: '' }));
+          }}
+          error={errors.password || apiError?.field('password')}
+        />
+        <div className="-mt-1 mb-4 flex items-center justify-between gap-3 text-sm">
+          {api.auth === 'cookie' ? <GlassCheckbox label="Remember me" checked={remember} onChange={setRemember} /> : <span />}
+          <Link to="/forgot-password" className={`inline-flex min-h-touch items-center ${glassLink}`}>
+            Forgot password?
+          </Link>
+        </div>
+        <GlassButton type="submit" loading={login.isPending || google.isPending} className="w-full">
+          Log in
+        </GlassButton>
+      </form>
+
+      {googleClientIds && (
+        <div role="group" aria-label="Or continue with" className="mt-5 flex flex-col items-center gap-4">
+          <span className="flex w-full items-center gap-3 text-xs text-glass-muted before:h-px before:flex-1 before:bg-glass-edge before:content-[''] after:h-px after:flex-1 after:bg-glass-edge after:content-['']">
+            or
+          </span>
           <GoogleSignInButton
             clientIds={googleClientIds}
             disabled={google.isPending}
@@ -146,62 +154,15 @@ function LoginForm({ onInvite }: { onInvite: () => void }) {
               run({ kind: 'google', credential });
             }}
           />
-        )
-      }
-    >
-      <form noValidate onSubmit={submit}>
-        <AuthHeading title="Log In" subtitle="Good to see you again" />
-        {formMessage && (
-          <p role="alert" className="m-0 mb-4 rounded-[6px] bg-auth-error/15 px-3 py-2 text-xs text-auth-error">
-            {formMessage}
-          </p>
-        )}
-        <AuthStagger index={1}>
-          <FloatingField
-            label="Email or National ID"
-            autoComplete="username"
-            value={identifier}
-            onChange={(e) => {
-              setIdentifier(e.target.value);
-              setErrors((x) => ({ ...x, identifier: '' }));
-            }}
-            error={errors.identifier || (pending.kind === 'password' && !homes ? apiError?.field('identifier') : undefined)}
-          />
-        </AuthStagger>
-        <AuthStagger index={2}>
-          <FloatingField
-            label="Password"
-            type="password"
-            revealable
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setErrors((x) => ({ ...x, password: '' }));
-            }}
-            error={errors.password || apiError?.field('password')}
-          />
-        </AuthStagger>
-        <AuthStagger index={3}>
-          <AuthMeta>
-            {api.auth === 'cookie' ? <AuthCheckbox label="Remember me" checked={remember} onChange={setRemember} /> : <span />}
-            <Link to="/forgot-password" className={authLink}>
-              Forgot password?
-            </Link>
-          </AuthMeta>
-        </AuthStagger>
-        <AuthStagger index={4}>
-          <AuthButton loading={login.isPending || google.isPending}>Log In</AuthButton>
-        </AuthStagger>
-        <AuthStagger index={5}>
-          <AuthFoot>
-            First time here?{' '}
-            <button type="button" onClick={onInvite} className={`${authLink} cursor-pointer border-0 bg-transparent p-0 font-auth text-xs`}>
-              Use your invitation
-            </button>
-          </AuthFoot>
-        </AuthStagger>
-      </form>
+        </div>
+      )}
+
+      <p className="m-0 mt-5 text-center text-sm text-glass-muted">
+        First time here?{' '}
+        <button type="button" onClick={onInvite} className={`cursor-pointer border-0 bg-transparent p-0 font-inter text-sm ${glassLink}`}>
+          Use your invitation
+        </button>
+      </p>
 
       <BottomSheet
         open={homes !== null}
@@ -219,7 +180,7 @@ function LoginForm({ onInvite }: { onInvite: () => void }) {
           }}
         />
       </BottomSheet>
-    </AuthFormLayout>
+    </>
   );
 }
 
@@ -231,25 +192,19 @@ function InviteHelp({ onLogIn }: { onLogIn: () => void }) {
   ];
   return (
     <div>
-      <AuthHeading title="Got an invitation?" subtitle="Tenants join through their landlord" />
-      <AuthStagger index={1}>
-        <ol className="m-0 mb-6 flex list-none flex-col gap-3 p-0">
-          {steps.map((step, i) => (
-            <li key={step} className="flex gap-3 text-sm leading-relaxed text-white/85">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-auth-emerald text-xs font-semibold">{i + 1}</span>
-              {step}
-            </li>
-          ))}
-        </ol>
-      </AuthStagger>
-      <AuthStagger index={2}>
-        <p className="m-0 mb-6 text-xs text-auth-muted">Lost the link or it expired? Ask your landlord or caretaker to send it again.</p>
-      </AuthStagger>
-      <AuthStagger index={3}>
-        <AuthButton type="button" onClick={onLogIn}>
-          I already have a password
-        </AuthButton>
-      </AuthStagger>
+      <GlassAuthHeading title="Got an invitation?" subtitle="Tenants join through their landlord" />
+      <ol className="m-0 mb-5 flex list-none flex-col gap-3 p-0">
+        {steps.map((step, i) => (
+          <li key={step} className="flex gap-3 text-[15px] leading-relaxed">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-glass-sage text-xs font-semibold text-glass-sage-ink">{i + 1}</span>
+            {step}
+          </li>
+        ))}
+      </ol>
+      <p className="m-0 mb-5 text-sm text-glass-muted">Lost the link or it expired? Ask your landlord or caretaker to send it again.</p>
+      <GlassButton onClick={onLogIn} className="w-full">
+        I already have a password
+      </GlassButton>
     </div>
   );
 }
