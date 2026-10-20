@@ -45,12 +45,12 @@ Override the target with `SERVER=user@host REMOTE=/path ./deploy/deploy.sh`.
 `.github/workflows/dev.yml`: a pull request into `dev` runs the checks (typecheck, lint, test, build); a merge (push) into `dev` runs
 them again and, only if they pass, runs `./deploy/deploy.sh` from GitHub, then checks both sites answer. Deploys queue one at a time.
 
-Repo settings → Secrets and variables → Actions (environment `dev` or repository):
+Repo settings → Environments → `dev` (or repository secrets). The server's host key is committed in `deploy/known_hosts`
+(update it if the server is rebuilt: `ssh-keyscan 102.212.246.251`, compared with a trusted `known_hosts`).
 
 | Name | Kind | Value |
 |---|---|---|
 | `DEPLOY_SSH_KEY` | secret | private key of the CI-only key `rentflow-ci` (its `.pub` is in the server's `~tito/.ssh/authorized_keys`) |
-| `DEPLOY_KNOWN_HOSTS` | secret | `ssh-keyscan 102.212.246.251` output (checked against a known-good `known_hosts`) |
 | `VITE_GOOGLE_CLIENT_ID` | variable | optional; written into both `.env.production` files (empty = Google button hidden) |
 
 Rotate the key: make a new one (`ssh-keygen -t ed25519 -N '' -C rentflow-ci -f rentflow-ci`), add the `.pub` to

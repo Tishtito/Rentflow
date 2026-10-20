@@ -43,11 +43,17 @@ jobs:
           cache: pnpm
 
       - name: SSH key for the server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY is empty: add it to the repo's dev environment (deploy/README.md, CI/CD)."
+            exit 1
+          fi
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cp deploy/known_hosts ~/.ssh/known_hosts
 
       # .env.production from the examples, with the Google client ID from the repo variable (empty = button hidden).
       - name: Production env
