@@ -103,7 +103,7 @@ add a new component only when nothing fits, in the right folder so the next scre
 | Folder | Components |
 |---|---|
 | `primitives` | `Button` (`primary`, `secondary`, `outline-brand`, `danger-outline`, `ghost`, `mint`; `md`/`lg`/`xl`), `ButtonLink`, `IconButton`, `Badge` + status badges, `Card`, `Eyebrow`, `VisuallyHidden`, `StatCard`, `StatGrid`, `ProgressBar`, `TextField`, `SelectField`, `SearchInput`, `FilterChips`, `ChannelPicker`, `SegmentedControl`, `SwitchRow`, `DataTable<T>`, `SidePanel`, `BottomSheet` |
-| `layout` | `AdminShell` (+ `landlordNav`, `superAdminNav`; props `user`, `onLogout`, `accountName`, `onSwitchAccount`; top bar + menu below `md`), `PageHeader`, `Tabs`, `TenantShell` (`base`), `TenantAuthLayout`, `CaretakerHeader` |
+| `layout` | `AdminShell` (+ `landlordNav`, `superAdminNav`; props `user`, `onLogout`, `accountName`, `onSwitchAccount`, `bottomNav`; top bar + menu below `md`), `BottomNav` (+ `landlordTabs`), `PageHeader`, `Tabs`, `TenantShell` (`base`), `TenantAuthLayout`, `CaretakerHeader` |
 | `feedback` | `Notice`, `LoadingState`, `ErrorState`, `ComingSoon`, `UpdatePrompt` (PWA), `OfflineBanner` |
 | `auth` | **Auth screens only** (dark leaf design, `rentflow-auth.html`): `AuthScene` (sliding Welcome/Form panels, `mode` + `flipped`), `AuthStagger`, `AuthWelcome`, `AuthHeading`, `FloatingField` (floating label, `revealable` password, `error`), `PasswordStrength`, `AuthButton` (`loading`), `AuthCheckbox`, `AuthMeta`, `AuthFoot`, `AuthFormLayout` (`social` = "OR" column), `AuthLogo`, `authLink` |
 | `billing` | `BillLinesTable`, `BillTotals`, `BillDocument`, `DeliveryList`, `LeaseStatement`, `BillingRunsTable`, `ChargeRateCard`, `RateHistoryTable` |
@@ -137,7 +137,8 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
   "Already living here" mode for tenants of newly onboarded landlords (no move-in bill).
 - **Production hosting:** `deploy/` (`deploy.sh` builds + uploads both apps, nginx sites; server/DNS/API setup is in `../backend/deploy/`) (admin.rentflow.codepasstech.top, rentflow.codepasstech.top; nginx serves `dist/` and hands
   `/api/` + `/sanctum/` to Laravel, so the web build keeps calling the API same-origin). Builds use `apps/*/.env.production`.
-- **Mobile:** `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
+- **Mobile:** phones (below `md`) get `BottomNav` in the admin app: Properties, Tenants, a raised Dashboard button in a
+  notch, Meters, Bills (only the tabs `allowedNav` allows; everything stays in the top bar's menu too). `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
   other columns as label / value; `Column.cardTitle | hideOnCard | cardLabel` to tune). Hand-built tables (`ReadingsTable`,
   `BillLinesTable`, `ActivityTable`, meter setup grid) have their own phone cards. Every `PageHeader` shows `BackButton`
   (previous page in the app, else `back` / the last breadcrumb link; `back={false}` hides it); portal pages via `PortalPage`.
@@ -145,11 +146,15 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
   `formMessage()` (`apps/admin/src/errors.ts`). Writes refresh all admin queries (`useAdminWrite` in `packages/api`).
 - **Bills** (`/admin/bills`: search, filters in the URL, totals, PDF download via `downloadInvoicePdf` / `api.download`, resend and
   void panels in `apps/admin/src/panels/BillPanels.tsx`; bill page shows Messages and void details).
-- **Coming soon (designed, waiting for an API):** tenant bills/payments/M-Pesa.
+- **Tenant portal after login:** home (`AmountDueCard` per home, latest `TenantBillCard` + PDF, recent payments), `/bills`,
+  `/bills/:id`, `/payments` (`usePortalHome` / `usePortalInvoices` / `usePortalInvoice` / `usePortalPayments`,
+  `downloadPortalInvoicePdf`). `AmountDueCard` hides the pay button until M-Pesa exists (no `onPay`). Bills are named for
+  the month their period starts (the 5 Nov – 4 Dec bill is the November bill).
+- **Coming soon (designed, waiting for an API):** M-Pesa payments from the portal.
 
 ## Next steps
 
-1. Tenant portal API → `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`.
+1. M-Pesa STK push from `AmountDueCard` (`onPay`, `paybill`, `accountRef`) once the backend has it.
 2. Lease search for `RecordPaymentPanel` (replace the lease-number field) once a leases API exists.
 3. Component tests (Testing Library) for `RecordPaymentPanel` / `MeterReadingCard` live calculations.
 4. Store release: decide the domain → real app IDs + `VITE_API_URL` (https), signing keys, Play Store / App Store

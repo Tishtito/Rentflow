@@ -1,6 +1,7 @@
 export * from './primitives';
 export * from './icons';
 export * from './layout/AdminShell';
+export * from './layout/BottomNav';
 export * from './layout/MobileShells';
 export * from './layout/PageHeader';
 export * from './feedback/Feedback';

@@ -1,12 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InvitationPreview, PortalLoginResult, PortalTenant } from '@rentflow/core';
-import { ApiError } from './client';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Invoice, InvitationPreview, Paginated, PortalHome, PortalLoginResult, PortalTenant, TenantPayment, Wrapped } from '@rentflow/core';
+import { ApiError, query, type ApiClient } from './client';
 import { useApi } from './context';
 
 /** Tenant portal (tenants table, `tenant` guard): /api/portal/* */
 
 export const portalKeys = {
   tenant: ['portal', 'tenant'] as const,
+  home: ['portal', 'home'] as const,
+  invoices: (page: number) => ['portal', 'invoices', page] as const,
+  invoice: (id: number) => ['portal', 'invoice', id] as const,
+  payments: (page: number) => ['portal', 'payments', page] as const,
 };
 
 /** The logged-in tenant, or null when logged out. */
@@ -127,4 +131,55 @@ export function useAcceptInvitation(token: string) {
     },
     onSuccess: (tenant) => qc.setQueryData(portalKeys.tenant, tenant),
   });
+}
+
+/* ---------- After login: home, bills, payments (the tenant's own only) ---------- */
+
+/** Home screen: each current home with its balance and latest bill, plus the last 5 payments. */
+export function usePortalHome() {
+  const api = useApi();
+  return useQuery({ queryKey: portalKeys.home, queryFn: () => api.get<PortalHome>('/api/portal/home') });
+}
+
+/** My bills, newest first (15 per page; void bills left out). */
+export function usePortalInvoices(page = 1) {
+  const api = useApi();
+  return useQuery({
+    queryKey: portalKeys.invoices(page),
+    queryFn: () => api.get<Paginated<Invoice>>(`/api/portal/invoices${query({ page })}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** One of my bills with its lines; 404 (ApiError) when it isn't mine. */
+export function usePortalInvoice(id: number) {
+  const api = useApi();
+  return useQuery({
+    queryKey: portalKeys.invoice(id),
+    queryFn: () => api.get<Wrapped<Invoice>>(`/api/portal/invoices/${id}`).then((r) => r.data),
+    enabled: Number.isInteger(id) && id > 0,
+  });
+}
+
+/** My confirmed payments, newest first (20 per page). */
+export function usePortalPayments(page = 1) {
+  const api = useApi();
+  return useQuery({
+    queryKey: portalKeys.payments(page),
+    queryFn: () => api.get<Paginated<TenantPayment>>(`/api/portal/payments${query({ page })}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Save one of my bills as a PDF (works with the cookie session and with the app's token). */
+export async function downloadPortalInvoicePdf(api: ApiClient, invoice: Pick<Invoice, 'id' | 'invoice_number'>): Promise<void> {
+  const blob = await api.download(`/api/portal/invoices/${invoice.id}/pdf`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${invoice.invoice_number}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

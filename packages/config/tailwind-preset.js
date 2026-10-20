@@ -14,6 +14,8 @@ export default {
         'auth-card': '0 30px 80px rgba(0, 0, 0, 0.55)',
         'auth-button': '0 8px 20px rgba(30, 142, 90, 0.35)',
       },
+      // Filters follow the element's shape (e.g. the admin bottom bar's notch), unlike box-shadow.
+      dropShadow: { bar: '0 6px 16px rgba(20, 35, 28, 0.14)' },
       // Auth screens: the panels' slide (slight overshoot) and the content swap.
       transitionTimingFunction: { swap: 'cubic-bezier(0.68, -0.15, 0.27, 1.15)' },
       transitionDuration: { swap: '700ms' },

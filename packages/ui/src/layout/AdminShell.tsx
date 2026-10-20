@@ -52,7 +52,8 @@ export const superAdminNav: NavItem[] = [
 /**
  * Admin portal frame: dark sidebar + main column. Below `md` (phones, the admin app) the sidebar
  * becomes a top bar with a menu button that opens the nav full-screen; it closes on navigation.
- * Respects the notch / status bar (safe-area insets) inside the Capacitor app.
+ * Respects the notch / status bar (safe-area insets) inside the Capacitor app. `bottomNav` (phones only,
+ * e.g. <BottomNav>) is added under the content, which then leaves room for it; hidden while the menu is open.
  *
  * Use as a route element: <Route element={<AdminShell nav={landlordNav} … />}> with child routes.
  */
@@ -64,6 +65,7 @@ export function AdminShell({
   onSwitchAccount,
   user,
   onLogout,
+  bottomNav,
   children,
 }: {
   nav: NavItem[];
@@ -73,6 +75,7 @@ export function AdminShell({
   onSwitchAccount?: () => void; // makes the account block a switcher button
   user?: { name: string; roleLabel: string; initials: string };
   onLogout?: () => void;
+  bottomNav?: ReactNode;
   children?: ReactNode; // defaults to <Outlet/>
 }) {
   const isSuper = variant === 'super';
@@ -196,9 +199,19 @@ export function AdminShell({
         )}
       </nav>
 
-      <main className="box-border flex min-w-0 flex-1 flex-col gap-6 px-4 pb-[calc(48px+env(safe-area-inset-bottom))] pt-6 md:px-10 md:pt-8">
+      <main
+        className={cn(
+          'box-border flex min-w-0 flex-1 flex-col gap-6 px-4 pt-6 md:px-10 md:pt-8',
+          // Phones with the bottom bar: room for it (64px bar + 8px gap + a little air) below the content.
+          bottomNav
+            ? 'pb-[calc(120px+env(safe-area-inset-bottom))] md:pb-[calc(48px+env(safe-area-inset-bottom))]'
+            : 'pb-[calc(48px+env(safe-area-inset-bottom))]',
+        )}
+      >
         {children ?? <Outlet />}
       </main>
+
+      {!menuOpen && bottomNav}
     </div>
   );
 }

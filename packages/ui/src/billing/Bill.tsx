@@ -120,7 +120,8 @@ export function BillDocument({
   paybill?: string; // M-Pesa paybill; the pay line is hidden until the account has one
   caretakerPhone?: string;
 }) {
-  const monthName = new Date(`${invoice.period_end}T00:00:00+03:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  // A bill is named for the month its period starts (billing day → day before the next).
+  const monthName = new Date(`${invoice.period_start}T00:00:00+03:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   return (
     <article
       aria-label="Bill"
