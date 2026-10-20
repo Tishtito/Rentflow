@@ -1,0 +1,68 @@
+# dev branch: pull requests into dev run the checks; a merge (push) into dev runs them again and, if they
+# pass, builds both apps and uploads them with deploy/deploy.sh. See deploy/README.md ("CI/CD").
+name: dev
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+
+# One deploy at a time, in merge order (never cancel a deploy halfway).
+concurrency:
+  group: dev-${{ github.event_name == 'push' && 'deploy' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4          # version from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: SSH key for the server
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      # .env.production from the examples, with the Google client ID from the repo variable (empty = button hidden).
+      - name: Production env
+        env:
+          GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          for app in admin portal; do
+            sed "s|^VITE_GOOGLE_CLIENT_ID=.*|VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}|" \
+              "apps/$app/.env.production.example" > "apps/$app/.env.production"
+          done
+
+      - name: Deploy
+        run: ./deploy/deploy.sh
+
+      - name: Health check
+        run: |
+          curl -fsS -o /dev/null https://admin.rentflow.codepasstech.top/
+          curl -fsS -o /dev/null https://rentflow.codepasstech.top/

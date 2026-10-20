@@ -39,3 +39,20 @@ editing a site later, copy it again and reload; re-run `sudo certbot --nginx` if
 Creates `apps/{admin,portal}/.env.production` from the `.example` if missing, runs `pnpm install --frozen-lockfile`,
 builds `@rentflow/admin` + `@rentflow/portal`, and uploads each `dist/` (`rsync --delete`).
 Override the target with `SERVER=user@host REMOTE=/path ./deploy/deploy.sh`.
+
+## CI/CD (GitHub Actions, branch `dev`)
+
+`.github/workflows/dev.yml`: a pull request into `dev` runs the checks (typecheck, lint, test, build); a merge (push) into `dev` runs
+them again and, only if they pass, runs `./deploy/deploy.sh` from GitHub, then checks both sites answer. Deploys queue one at a time.
+
+Repo settings → Secrets and variables → Actions (environment `dev` or repository):
+
+| Name | Kind | Value |
+|---|---|---|
+| `DEPLOY_SSH_KEY` | secret | private key of the CI-only key `rentflow-ci` (its `.pub` is in the server's `~tito/.ssh/authorized_keys`) |
+| `DEPLOY_KNOWN_HOSTS` | secret | `ssh-keyscan 102.212.246.251` output (checked against a known-good `known_hosts`) |
+| `VITE_GOOGLE_CLIENT_ID` | variable | optional; written into both `.env.production` files (empty = Google button hidden) |
+
+Rotate the key: make a new one (`ssh-keygen -t ed25519 -N '' -C rentflow-ci -f rentflow-ci`), add the `.pub` to
+`authorized_keys`, update `DEPLOY_SSH_KEY` in **both** repos, then remove the old line from `authorized_keys`.
+`./deploy/deploy.sh` from a laptop still works for a manual deploy.
