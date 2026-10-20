@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles/index.css"
+    "./styles.css": "./src/styles/index.css",
+    "./portal.css": "./src/styles/portal.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -13,7 +14,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@rentflow/core": "workspace:*"
+    "@rentflow/core": "workspace:*",
+    "lucide-react": "^1.60.0"
   },
   "peerDependencies": {
     "react": "^18.3.1",

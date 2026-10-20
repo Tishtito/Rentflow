@@ -1,0 +1,117 @@
+/*
+ * Tenant portal "dark botanical glass" (imported by apps/portal only, after styles.css).
+ * Colours come from the `glass` tokens (packages/config/tokens.js) through theme().
+ * Plain CSS on purpose: this file is built on its own, without @tailwind directives.
+ */
+
+html {
+  background: theme('colors.glass.night');
+  color: theme('colors.glass.text');
+  font-family: theme('fontFamily.inter');
+  color-scheme: dark;
+}
+
+/* Links inherit (the shared base makes them brand green); :where() keeps colour classes stronger. */
+:where(.portal) a,
+:where(.portal) a:hover {
+  color: inherit;
+}
+
+:where(.portal) :focus-visible {
+  outline: 2px solid theme('colors.glass.sage.DEFAULT');
+  outline-offset: 2px;
+}
+
+/* Page background: forest gradient with soft, very blurred sage glows. */
+.glass-bg {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: linear-gradient(160deg, theme('colors.glass.night') 0%, theme('colors.glass.forest') 100%);
+  background-attachment: fixed;
+}
+.glass-bg::before,
+.glass-bg::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  border-radius: 9999px;
+  background: theme('colors.glass.glow');
+  filter: blur(80px);
+  pointer-events: none;
+}
+.glass-bg::before {
+  width: 360px;
+  height: 360px;
+  top: -80px;
+  right: -100px;
+}
+.glass-bg::after {
+  width: 420px;
+  height: 420px;
+  bottom: 10%;
+  left: -160px;
+}
+
+/* Frosted surfaces. :where() = zero specificity, so utilities (bg-…, border-…) can tint a card. */
+:where(.glass, .glass-strong) {
+  background: theme('colors.glass.fill');
+  border: 1px solid theme('colors.glass.edge');
+  box-shadow: theme('boxShadow.glass');
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+:where(.glass-strong) {
+  background: theme('colors.glass.raised');
+}
+
+/* Solid fallbacks: no backdrop blur, or the user asked for less transparency. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :where(.glass, .glass-strong) {
+    background: theme('colors.glass.solid');
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :where(.glass, .glass-strong) {
+    background: theme('colors.glass.solid');
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass-bg::before,
+  .glass-bg::after {
+    display: none;
+  }
+}
+
+/* Loading placeholders: shimmering glass blocks. */
+:where(.glass-skeleton) {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: theme('colors.glass.fill');
+}
+.glass-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: glass-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes glass-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-skeleton::after {
+    animation: none;
+  }
+  .portal *,
+  .portal *::before,
+  .portal *::after {
+    transition-duration: 0.01ms !important;
+  }
+}

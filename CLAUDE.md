@@ -78,9 +78,18 @@ add a new component only when nothing fits, in the right folder so the next scre
 10. **App-safe layout:** fixed/sticky bars pad with `env(safe-area-inset-top|bottom)` (notches, home bar in the
     Capacitor apps); the shells already do. Native-only behaviour goes through `@rentflow/native`, never
     `Capacitor.*` calls in pages.
-11. **Auth screens** (login, sign-up, forgot password, invitation) use the `auth` tokens (`bg-auth-night`,
+11. **Admin auth screens** (login, sign-up, forgot password, set password) use the `auth` tokens (`bg-auth-night`,
     `text-auth-mint`, `font-auth` = Poppins, `ease-swap`, `animate-auth-*`) and `@rentflow/ui` auth components only.
-    Never use them inside the portals, and never the portal look on auth screens.
+    Never use them inside the admin app's pages. The **tenant portal's** auth screens use `GlassAuthLayout` instead (below).
+12. **Tenant portal = "dark botanical glass"**, portal only: `glass` tokens (`bg-glass-fill`, `text-glass-muted`,
+    `text-glass-sage`, `bg-glass-amber-soft`…), `font-serif` (Fraunces) headings + `font-inter` text, `rounded-glass` /
+    `rounded-bar`, `shadow-glass`; surfaces via the `glass` / `glass-strong` / `glass-bg` / `glass-skeleton` classes in
+    `packages/ui/src/styles/portal.css` (imported by the portal only; solid fallbacks for no blur and reduced
+    transparency). Build portal screens from `packages/ui/src/portal/` (`GlassCard`, `StatusPill` / `InvoicePill`,
+    `IconCircle`, `LineItemRow`, `ListRow`, `PortalHeader`, `FloatingTabBar`, `GlassButton`, `GlassLoading`, `GlassError`,
+    `GlassEmpty`, `GlassPager`, `GlassAvatar`; auth: `GlassAuthLayout` (login photos in `apps/portal/public/login/`,
+    portrait below `md`, landscape from `md`), `GlassField`, `GlassCheckbox`, `GlassFormAlert`, `glassLink`). Icons there
+    are Lucide (`lucide-react`, stroke 1.75); the admin keeps `icons.tsx`. Tab roots have no Back; detail pages do.
 
 ## PWA and the Android/iOS apps
 
@@ -88,6 +97,11 @@ add a new component only when nothing fits, in the right folder so the next scre
   (`pwa-assets.config.ts`), Workbox service worker that precaches the app shell (works offline) and caches
   Google Fonts. **API responses are never cached** (personal data, shared phones). `registerType: 'prompt'`:
   `AppChrome` shows `UpdatePrompt` when a new version is deployed. `OfflineBanner` shows while offline.
+- **Install pop-up** (`InstallPrompt` in `@rentflow/ui`, `look="glass"` in the portal / `"light"` in admin; state from
+  `useInstallPrompt` in `@rentflow/native`, rules in `installMode` in `@rentflow/core`): on every visit ~2 s after load,
+  until installed. Chrome/Edge/Android: "Install" opens the browser's dialog (`beforeinstallprompt`); iPhone/iPad: Share →
+  Add to Home Screen steps. Never in the Capacitor apps, when already installed, or after "Not now"/Esc in that tab
+  (`sessionStorage`); hidden while `UpdatePrompt` shows. Test with `pnpm build` + `vite preview` (no service worker in dev).
 - **Capacitor** (`apps/*/capacitor.config.ts`, `android/`, `ios/`): `pnpm build:native` = `vite build --mode native`
   (no service worker; `.env.native` sets `VITE_API_URL`), `pnpm cap:sync` copies it into the native projects.
   - App IDs `com.codepasstech.rentflow.tenant` / `.admin` are **placeholders** (no domain yet): change `appId` in
@@ -110,7 +124,8 @@ add a new component only when nothing fits, in the right folder so the next scre
 | `payments` | `PaymentsTable`, `PaymentOutcomeBadge`, `UnmatchedPaymentRow`, `RecordPaymentPanel` (live balance-after, API `errors`) |
 | `readings` | `MeterReadingCard`, `ReadingTaskLink` |
 | `dashboard` | `AttentionPanel`, `AttentionItem`, `CollectionBars`, `AmountRow` |
-| `tenant` | `AmountDueCard`, `TenantBillCard`, `PaymentHistoryList`, `HomeChoiceList` |
+| `tenant` | `AmountDueCard`, `TenantBillCard` (glass, portal), `PaymentHistoryList` (admin), `HomeChoiceList` |
+| `portal` | Tenant portal glass kit, see design rule 12 |
 | `units` | `MoveInPanel` |
 
 Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).

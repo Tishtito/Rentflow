@@ -1,32 +1,18 @@
 import { Link } from 'react-router-dom';
-import { AuthHeading, AuthScene, AuthStagger, AuthWelcome, authLink } from '@rentflow/ui';
+import { GlassAuthHeading, GlassAuthLayout, glassLink } from '@rentflow/ui';
+import { authPhotos } from '../PortalLayout';
 
-/** Password reset isn't built yet (no API); explains what to do meanwhile, in the auth look. */
+/** Password reset isn't built yet (no API); explains what to do meanwhile. */
 export function ForgotPasswordPage() {
   return (
-    <AuthScene<'only'>
-      mode="only"
-      flipped={() => true}
-      welcome={{
-        only: <AuthWelcome title={<>Forgot your<br />password?</>} text="It happens. Resetting it from here is coming soon." />,
-      }}
-      form={{
-        only: (
-          <div>
-            <AuthHeading title="Reset password" subtitle="Coming soon" />
-            <AuthStagger index={1}>
-              <p className="m-0 mb-6 text-sm leading-relaxed text-white/80">
-                Ask your landlord or caretaker to send you a new invitation link, then set a new password from it.
-              </p>
-            </AuthStagger>
-            <AuthStagger index={2}>
-              <Link to="/login" className={authLink}>
-                ← Back to log in
-              </Link>
-            </AuthStagger>
-          </div>
-        ),
-      }}
-    />
+    <GlassAuthLayout photos={authPhotos} tagline="It happens">
+      <GlassAuthHeading title="Forgot your password?" subtitle="Resetting it from here is coming soon" />
+      <p className="m-0 mb-5 text-[15px] leading-relaxed">
+        Ask your landlord or caretaker to send you a new invitation link, then set a new password from it.
+      </p>
+      <Link to="/login" className={glassLink}>
+        ← Back to log in
+      </Link>
+    </GlassAuthLayout>
   );
 }

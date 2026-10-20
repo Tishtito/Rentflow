@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { ApiProvider } from '@rentflow/api';
 import '@rentflow/ui/styles.css';
+import '@rentflow/ui/portal.css';
 import { api, queryClient } from './api';
 import { AppChrome } from './AppChrome';
 import { router } from './router';
