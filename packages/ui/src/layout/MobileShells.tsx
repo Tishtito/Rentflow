@@ -1,49 +1,30 @@
-import type { ComponentType, ReactNode, SVGProps } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
-import { cn } from '@rentflow/core';
-import { CardIcon, ChevronLeftIcon, HomeIcon, PersonIcon, ReceiptIcon } from '../icons';
+import type { ReactNode } from 'react';
+import { Link, Outlet } from 'react-router-dom';
+import { CreditCard, House, Receipt, User } from 'lucide-react';
+import { ChevronLeftIcon } from '../icons';
+import { FloatingTabBar, type GlassTab } from '../portal/Glass';
 
-/* ------------------------------------------------------------------ */
-/* Tenant portal: phone-first, content capped at 480px on larger screens */
-/* ------------------------------------------------------------------ */
-
-type TenantTab = { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>>; end?: boolean };
+/* ------------------------------------------------------------------------- */
+/* Tenant portal: phone-first glass, content capped at 520px on larger screens */
+/* ------------------------------------------------------------------------- */
 
 /** Bottom tabs; `base` is where the portal is mounted ('' when it is the whole app). */
-const tenantTabs = (base: string): TenantTab[] => [
-  { to: base || '/', label: 'Home', icon: HomeIcon, end: true },
-  { to: `${base}/bills`, label: 'Bills', icon: ReceiptIcon },
-  { to: `${base}/payments`, label: 'Payments', icon: CardIcon },
-  { to: `${base}/profile`, label: 'Profile', icon: PersonIcon },
+const tenantTabs = (base: string): GlassTab[] => [
+  { to: base || '/', label: 'Home', icon: House, end: true },
+  { to: `${base}/bills`, label: 'Bills', icon: Receipt },
+  { to: `${base}/payments`, label: 'Payments', icon: CreditCard },
+  { to: `${base}/profile`, label: 'Profile', icon: User },
 ];
 
+/**
+ * Logged-in tenant frame: forest gradient with soft glows, the page, and the floating glass tab bar.
+ * The bottom padding keeps the last card clear of the bar (bar ≈ 64px + 16px gap + 24px air).
+ */
 export function TenantShell({ base = '', children }: { base?: string; children?: ReactNode }) {
   return (
-    <div className="min-h-screen bg-canvas">
-      <div className="mx-auto max-w-[480px] pb-[calc(96px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">{children ?? <Outlet />}</div>
-      <nav
-        aria-label="Tenant portal"
-        className="fixed inset-x-0 bottom-0 border-t border-line bg-surface px-1 pb-[calc(14px+env(safe-area-inset-bottom))] pt-1.5"
-      >
-        <div className="mx-auto grid max-w-[480px] grid-cols-4">
-          {tenantTabs(base).map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[52px] flex-col items-center justify-center gap-1 text-xs no-underline',
-                  isActive ? 'font-semibold text-brand' : 'text-muted',
-                )
-              }
-            >
-              <Icon width={22} height={22} />
-              {label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
+    <div className="glass-bg text-glass-text">
+      <div className="mx-auto max-w-[520px] pb-[calc(112px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">{children ?? <Outlet />}</div>
+      <FloatingTabBar tabs={tenantTabs(base)} label="Tenant portal" />
     </div>
   );
 }

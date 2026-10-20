@@ -13,6 +13,7 @@ export default {
         sheet: '0 6px 24px rgba(20, 35, 28, 0.10)',
         'auth-card': '0 30px 80px rgba(0, 0, 0, 0.55)',
         'auth-button': '0 8px 20px rgba(30, 142, 90, 0.35)',
+        glass: '0 10px 30px rgba(0, 0, 0, 0.25)', // tenant portal cards
       },
       // Filters follow the element's shape (e.g. the admin bottom bar's notch), unlike box-shadow.
       dropShadow: { bar: '0 6px 16px rgba(20, 35, 28, 0.14)' },
