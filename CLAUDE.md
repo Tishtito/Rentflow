@@ -135,7 +135,7 @@ Icons: `packages/ui/src/icons.tsx` (stroke SVGs, `currentColor`, aria-hidden).
   correction in `panels/MeterHistoryPanel.tsx`. **Meter setup** (`/admin/properties/:id/meters`, `MeterSetupPage`): units ×
   metered charges grid. **Getting started** checklist on the dashboard (`SetupChecklist`, `GET setup`). The move-in panel has a
   "Already living here" mode for tenants of newly onboarded landlords (no move-in bill).
-- **Production hosting:** `../deploy/` (admin.rentflow.codepasstech.top, rentflow.codepasstech.top; nginx serves `dist/` and hands
+- **Production hosting:** `deploy/` (`deploy.sh` builds + uploads both apps, nginx sites; server/DNS/API setup is in `../backend/deploy/`) (admin.rentflow.codepasstech.top, rentflow.codepasstech.top; nginx serves `dist/` and hands
   `/api/` + `/sanctum/` to Laravel, so the web build keeps calling the API same-origin). Builds use `apps/*/.env.production`.
 - **Mobile:** `DataTable` renders a table from `md` up and a card per row on phones (title column + `actions` icons on top,
   other columns as label / value; `Column.cardTitle | hideOnCard | cardLabel` to tune). Hand-built tables (`ReadingsTable`,
