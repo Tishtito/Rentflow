@@ -59,6 +59,10 @@ export interface Property {
   vacant_count?: number;
   /** What tenants in this property owe (positive lease balances). */
   arrears_total?: Money;
+  /** This property's own billing day (1–28); null = the account's. */
+  billing_day?: number | null;
+  /** The day its units bill on unless they have their own. */
+  effective_billing_day?: number;
 }
 
 export interface Meter {
@@ -95,9 +99,29 @@ export interface Unit {
   default_deposit?: Money;
   status: UnitStatus;
   notes?: string | null;
+  /** This unit's own billing day (1–28); null = its property's / the account's. */
+  billing_day?: number | null;
+  /** The day it actually bills on. */
+  effective_billing_day?: number;
   property?: Pick<Property, 'id' | 'name'>;
   current_lease?: UnitLease | null;
   meters?: Meter[];
+  /** How each of the property's metered utilities is billed for this unit (GET properties/{id}/units). */
+  utilities?: UnitUtility[];
+}
+
+/** A metered utility for one unit: by meter, or a fixed amount a month (no readings). */
+export interface UnitUtility {
+  charge_code: string;
+  label: string;
+  unit_of_measure: string | null;
+  billing_type: BillingType;
+  /** Fixed only: KES a month. */
+  amount: Money | null;
+  /** Price per unit when billed by meter. */
+  metered_rate: Money;
+  /** A change waiting for the unit's next bill. */
+  pending: { billing_type: BillingType; amount: Money | null; from: string } | null;
 }
 
 export interface Tenant {
@@ -205,8 +229,12 @@ export interface Payment {
   tenant_id: number;
   invoice_id: number | null;
   amount: Money;
+  /** Lease balance right after this payment (negative = credit); null on payments from before receipts. */
+  balance_after: Money | null;
   method: PaymentMethod;
   reference: string | null;
+  /** RCT-2026-000001; null until confirmed. The receipt PDF: GET /api/admin/payments/{id}/receipt. */
+  receipt_number: string | null;
   payer_phone: string | null;
   paid_at: ISODateTime;
   status: PaymentStatus;
@@ -276,6 +304,8 @@ export interface MeterSetup {
     status: UnitStatus;
     /** charge_code → fitted meter, or null when still to fit. */
     meters: Record<string, { id: number; meter_number: string | null; initial_reading: Money } | null>;
+    /** Charges this unit pays a fixed amount for: no meter needed. */
+    fixed: string[];
   }>;
   missing: number;
 }
@@ -554,8 +584,11 @@ export interface TenantPayment {
   lease_id: number;
   invoice_id: number | null;
   amount: Money;
+  balance_after: Money | null;
   method: PaymentMethod;
   reference: string | null;
+  /** The receipt PDF: GET /api/portal/payments/{id}/receipt. */
+  receipt_number: string | null;
   paid_at: ISODateTime;
   invoice_number?: string | null;
 }
@@ -595,6 +628,10 @@ export interface WhatsAppConnection {
   display_phone_number: string | null;
   verified_name: string | null;
   template_name: string;
+  /** The tenant invitation template in use (the landlord's own, or rentflow_tenant_invitation). */
+  invitation_template_name: string;
+  /** The payment receipt template in use (the landlord's own, or rentflow_payment_receipt). */
+  receipt_template_name: string;
   template_language: string;
   verified_at: ISODateTime | null;
   /** Paste into Meta: WhatsApp → Configuration → Webhook → Callback URL. */

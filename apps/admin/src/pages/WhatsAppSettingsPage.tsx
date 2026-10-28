@@ -9,10 +9,12 @@ const empty: Required<SaveWhatsAppBody> = {
   access_token: '',
   app_secret: '',
   template_name: 'rentflow_bill_issued',
-  template_language: 'en',
+  invitation_template_name: 'rentflow_tenant_invitation',
+  receipt_template_name: 'rentflow_payment_receipt',
+  template_language: 'en_US',
 };
 
-/** Bills by WhatsApp from the landlord's own number (GET/PUT/DELETE /api/admin/whatsapp). */
+/** Bills, receipts and tenant invitations by WhatsApp from the landlord's own number (GET/PUT/DELETE /api/admin/whatsapp). */
 export function WhatsAppSettingsPage() {
   const canEdit = useCan()('whatsapp.manage');
   const connection = useWhatsAppConnection();
@@ -28,6 +30,8 @@ export function WhatsAppSettingsPage() {
         phone_number_id: current.phone_number_id,
         business_account_id: current.business_account_id,
         template_name: current.template_name,
+        invitation_template_name: current.invitation_template_name,
+        receipt_template_name: current.receipt_template_name,
         template_language: current.template_language,
       }));
     }
@@ -44,7 +48,7 @@ export function WhatsAppSettingsPage() {
     <>
       <PageHeader
         title="WhatsApp"
-        subtitle="Send bills from your own WhatsApp Business number, using your Meta app."
+        subtitle="Send bills, receipts and tenant invitations from your own WhatsApp Business number, using your Meta app."
         badge={current ? <WhatsAppStatusBadge status={current.status} /> : <Badge>Not connected</Badge>}
       />
 
@@ -88,9 +92,39 @@ export function WhatsAppSettingsPage() {
               error={error?.field('app_secret')}
               disabled={!canEdit}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="Template name" value={form.template_name} onChange={set('template_name')} error={error?.field('template_name')} disabled={!canEdit} />
-              <TextField label="Language" value={form.template_language} onChange={set('template_language')} error={error?.field('template_language')} disabled={!canEdit} />
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+              <TextField
+                label="Bill template"
+                value={form.template_name}
+                onChange={set('template_name')}
+                hint="Approved template for new bills."
+                error={error?.field('template_name')}
+                disabled={!canEdit}
+              />
+              <TextField
+                label="Invitation template"
+                value={form.invitation_template_name}
+                onChange={set('invitation_template_name')}
+                hint="Approved template that invites tenants to log in and get the app."
+                error={error?.field('invitation_template_name')}
+                disabled={!canEdit}
+              />
+              <TextField
+                label="Receipt template"
+                value={form.receipt_template_name}
+                onChange={set('receipt_template_name')}
+                hint="Approved template for payment receipts (PDF attached)."
+                error={error?.field('receipt_template_name')}
+                disabled={!canEdit}
+              />
+              <TextField
+                label="Language"
+                value={form.template_language}
+                onChange={set('template_language')}
+                hint="Used by all templates; must match Meta (English (US) = en_US)."
+                error={error?.field('template_language')}
+                disabled={!canEdit}
+              />
             </div>
             {save.isSuccess && <Notice tone="success">Saved. Meta accepted the credentials.</Notice>}
             {error && Object.keys(error.errors).length === 0 && <Notice tone="danger">{error.message}</Notice>}
