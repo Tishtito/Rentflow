@@ -1,16 +1,49 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useChargeRates, useSaveMeter, useSaveUnit } from '@rentflow/api';
-import { formatQuantity, toCents, type Meter, type Unit } from '@rentflow/core';
-import { Button, Eyebrow, Notice, SelectField, SidePanel, TextField } from '@rentflow/ui';
+import { billingDayChange, formatDate, formatKES, formatQuantity, ordinal, toCents, type Meter, type Unit } from '@rentflow/core';
+import { Button, Eyebrow, Notice, SegmentedControl, SelectField, SidePanel, TextField } from '@rentflow/ui';
 import { chargeInfo, currentCharges } from '../charges';
 import { fieldErrors, formMessage } from '../errors';
+import { billingDayOptions } from './PropertyPanel';
 
-const unitFields = ['unit_number', 'type', 'bedrooms', 'floor', 'default_rent', 'default_deposit', 'status', 'notes'];
+const unitFields = ['unit_number', 'type', 'bedrooms', 'floor', 'default_rent', 'default_deposit', 'status', 'notes', 'utilities', 'billing_day'];
 
-/** Add a unit (no `unit`) or edit one, including its meters. */
-export function UnitPanel({ propertyId, unit, onClose }: { propertyId: number; unit?: Unit; onClose: () => void }) {
+type UtilityChoice = { billing_type: 'metered' | 'fixed'; amount: string };
+
+/**
+ * Add a unit (no `unit`) or edit one, including its meters and billing day.
+ * `inheritedBillingDay`: the day it bills on without its own (the property's, else the account's).
+ */
+export function UnitPanel({
+  propertyId,
+  unit,
+  inheritedBillingDay,
+  onClose,
+}: {
+  propertyId: number;
+  unit?: Unit;
+  inheritedBillingDay: number;
+  onClose: () => void;
+}) {
   const save = useSaveUnit();
+  const rates = useChargeRates(propertyId);
+  // The property's metered utilities; each can be billed by meter or a fixed amount for this unit.
+  const utilities = (unit?.utilities ?? currentCharges(rates.data).filter((r) => r.billing_type === 'metered')).map((u) => ({
+    charge_code: u.charge_code,
+    label: u.label,
+    unit_of_measure: u.unit_of_measure,
+    current: 'pending' in u ? u : null,
+  }));
+  const [choices, setChoices] = useState<Record<string, UtilityChoice>>(() =>
+    Object.fromEntries(
+      (unit?.utilities ?? []).map((u) => {
+        const shown = u.pending ?? u; // edit what the next bill will use
+        return [u.charge_code, { billing_type: shown.billing_type, amount: shown.amount ? String(toCents(shown.amount) / 100) : '' }];
+      }),
+    ),
+  );
+  const choiceFor = (code: string): UtilityChoice => choices[code] ?? { billing_type: 'metered', amount: '' };
   const [form, setForm] = useState({
     unit_number: unit?.unit_number ?? '',
     type: unit?.type ?? '',
@@ -19,11 +52,19 @@ export function UnitPanel({ propertyId, unit, onClose }: { propertyId: number; u
     default_rent: unit ? String(toCents(unit.default_rent) / 100) : '',
     default_deposit: unit?.default_deposit ? String(toCents(unit.default_deposit) / 100) : '',
     status: unit?.status ?? 'vacant',
+    billing_day: unit?.billing_day ? String(unit.billing_day) : '',
   });
   const errors = fieldErrors(save.error);
   const message = formMessage(save.error, unitFields);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
   const occupied = unit?.status === 'occupied';
+  // A let unit whose day changes: its next bill moves, and that bill also charges the days in between.
+  const lease = unit?.current_lease;
+  const newDay = form.billing_day ? Number(form.billing_day) : inheritedBillingDay;
+  const dayChange =
+    lease?.next_billing_date && newDay !== (unit?.effective_billing_day ?? inheritedBillingDay)
+      ? billingDayChange(lease.next_billing_date, newDay, toCents(lease.monthly_rent))
+      : null;
 
   return (
     <SidePanel title={unit ? `Unit ${unit.unit_number}` : 'Add unit'} subtitle={unit ? 'Details and meters' : 'Starts vacant; move a tenant in next'} onClose={onClose}>
@@ -42,6 +83,11 @@ export function UnitPanel({ propertyId, unit, onClose }: { propertyId: number; u
               default_rent: form.default_rent || '0',
               default_deposit: form.default_deposit || null,
               ...(unit && !occupied ? { status: form.status as 'vacant' | 'reserved' | 'maintenance' } : {}),
+              billing_day: form.billing_day ? Number(form.billing_day) : null,
+              utilities: utilities.map((u) => {
+                const c = choiceFor(u.charge_code);
+                return { charge_code: u.charge_code, billing_type: c.billing_type, amount: c.billing_type === 'fixed' ? c.amount || null : null };
+              }),
             },
             { onSuccess: () => !unit && onClose() },
           );
@@ -73,6 +119,76 @@ export function UnitPanel({ propertyId, unit, onClose }: { propertyId: number; u
               ]}
             />
           ))}
+        <SelectField
+          label="Billing day"
+          hint={unit?.billing_day == null ? 'Most units follow the property. Give this one its own day if it bills on a different date.' : undefined}
+          value={form.billing_day}
+          onChange={set('billing_day')}
+          error={errors.billing_day}
+          options={billingDayOptions(`Property default (${ordinal(inheritedBillingDay)})`)}
+        />
+        {dayChange && (
+          <Notice tone="info">
+            The next bill moves to {formatDate(dayChange.nextBillingDate, { year: true })}
+            {dayChange.gap
+              ? ` and also charges ${formatDate(dayChange.gap.periodStart)} – ${formatDate(dayChange.gap.periodEnd)} (${dayChange.gap.days} days): ${formatKES(dayChange.gap.amountCents / 100)}.`
+              : '.'}
+          </Notice>
+        )}
+        {utilities.length > 0 && (
+          <section className="flex flex-col gap-3 border-t border-line pt-4">
+            <Eyebrow>Utilities</Eyebrow>
+            <span className="text-xs text-muted">
+              {occupied && unit?.current_lease?.next_billing_date
+                ? `Changes apply from the next bill on ${formatDate(unit.current_lease.next_billing_date)}.`
+                : 'Bill each by meter readings, or a fixed amount every month (no meter needed).'}
+            </span>
+            {utilities.map((u, i) => {
+              const c = choiceFor(u.charge_code);
+              const pending = u.current?.pending;
+              return (
+                <div key={u.charge_code} className="flex flex-col gap-2 rounded-md bg-sunken p-3">
+                  <SegmentedControl
+                    legend={u.label}
+                    name={`utility-${u.charge_code}`}
+                    value={c.billing_type}
+                    onChange={(v) => setChoices({ ...choices, [u.charge_code]: { ...c, billing_type: v } })}
+                    options={[
+                      { value: 'metered', label: 'By meter' },
+                      { value: 'fixed', label: 'Fixed amount' },
+                    ]}
+                  />
+                  {c.billing_type === 'fixed' ? (
+                    <TextField
+                      label={`${u.label} per month (KES)`}
+                      inputMode="decimal"
+                      numeric
+                      required
+                      value={c.amount}
+                      onChange={(e) => setChoices({ ...choices, [u.charge_code]: { ...c, amount: e.target.value } })}
+                      error={
+                        errors[`utilities.${i}.amount`] ?? errors[`utilities.${i}.billing_type`] ?? errors[`utilities.${i}.charge_code`]
+                      }
+                    />
+                  ) : (
+                    u.current && (
+                      <span className="text-xs text-muted">
+                        {formatKES(u.current.metered_rate)} per {u.unit_of_measure || 'unit'} used
+                      </span>
+                    )
+                  )}
+                  {pending && u.current && (
+                    <span className="text-xs text-muted">
+                      Now {u.current.billing_type === 'fixed' ? `fixed ${formatKES(u.current.amount ?? '0')}` : 'by meter'}; from{' '}
+                      {formatDate(pending.from)}{' '}
+                      {pending.billing_type === 'fixed' ? `fixed ${formatKES(pending.amount ?? '0')}` : 'by meter'}.
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        )}
         <Button type="submit" variant={unit ? 'secondary' : 'primary'} size="lg" disabled={save.isPending}>
           {save.isPending ? 'Saving…' : unit ? 'Save unit' : 'Add unit'}
         </Button>
@@ -86,7 +202,8 @@ export function UnitPanel({ propertyId, unit, onClose }: { propertyId: number; u
 function MetersSection({ propertyId, unit }: { propertyId: number; unit: Unit }) {
   const rates = useChargeRates(propertyId);
   const metered = currentCharges(rates.data).filter((r) => r.billing_type === 'metered');
-  const missing = metered.filter((r) => !unit.meters?.some((m) => m.charge_code === r.charge_code));
+  const fixed = (code: string) => unit.utilities?.find((u) => u.charge_code === code)?.billing_type === 'fixed';
+  const missing = metered.filter((r) => !fixed(r.charge_code) && !unit.meters?.some((m) => m.charge_code === r.charge_code));
   const [editing, setEditing] = useState<{ replace?: Meter; code: string } | null>(null);
 
   return (

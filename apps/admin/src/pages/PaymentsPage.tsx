@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ApiError, usePayments, useRecordPayment } from '@rentflow/api';
+import { ApiError, downloadPaymentReceipt, useApi, usePayments, useRecordPayment } from '@rentflow/api';
 import { Button, Card, ErrorState, LoadingState, Notice, PageHeader, PaymentsTable, RecordPaymentPanel, TextField } from '@rentflow/ui';
 
 /** Fields the panel shows errors beside; anything else goes in the notice at the top. */
@@ -21,6 +21,8 @@ export function PaymentsPage() {
   const [panelOpen, setPanelOpen] = useState(params.has('lease'));
   const [leaseId, setLeaseId] = useState(params.get('lease') ?? '');
   const [saved, setSaved] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const api = useApi();
   const invoiceId = positiveInt(params.get('invoice'));
 
   const payments = usePayments({ page });
@@ -58,9 +60,10 @@ export function PaymentsPage() {
 
       {saved && (
         <Notice tone="success" title="Payment recorded">
-          The bill's balance and status are updated.
+          The bill's balance and status are updated, and the tenant is sent a receipt.
         </Notice>
       )}
+      {downloadError && <Notice tone="danger">{downloadError}</Notice>}
 
       <div className="flex flex-wrap items-start gap-6">
         <Card id="all" title="All payments" padded={false} className="min-w-0 flex-[3_1_560px]">
@@ -70,7 +73,14 @@ export function PaymentsPage() {
             <ErrorState className="m-4" message={payments.error.message} onRetry={() => void payments.refetch()} />
           ) : (
             <>
-              <PaymentsTable payments={payments.data.data} invoiceHref={(p) => `/admin/bills/${p.invoice_id}`} />
+              <PaymentsTable
+                payments={payments.data.data}
+                invoiceHref={(p) => `/admin/bills/${p.invoice_id}`}
+                onDownloadReceipt={(p) => {
+                  setDownloadError(null);
+                  downloadPaymentReceipt(api, p).catch((e: Error) => setDownloadError(`Couldn't download ${p.receipt_number}: ${e.message}`));
+                }}
+              />
               {meta && (
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 text-[13px] text-muted">
                   <span className="num">

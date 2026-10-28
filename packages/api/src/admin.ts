@@ -219,6 +219,19 @@ export async function downloadInvoicePdf(api: ApiClient, invoice: Pick<Invoice, 
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** Download a payment's receipt PDF and save it (same file the tenant gets). */
+export async function downloadPaymentReceipt(api: ApiClient, payment: Pick<Payment, 'id' | 'receipt_number'>): Promise<void> {
+  const blob = await api.download(`/api/admin/payments/${payment.id}/receipt`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${payment.receipt_number ?? `receipt-${payment.id}`}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 export function useInvoice(id: number) {
   const api = useApi();
   return useQuery({
@@ -272,6 +285,10 @@ export interface SaveWhatsAppBody {
   access_token?: string;
   app_secret?: string;
   template_name?: string;
+  /** The tenant invitation template; empty = rentflow_tenant_invitation. */
+  invitation_template_name?: string;
+  /** The payment receipt template; empty = rentflow_payment_receipt. */
+  receipt_template_name?: string;
   template_language?: string;
 }
 
@@ -359,6 +376,8 @@ export interface PropertyBody {
   caretaker_id?: number | null;
   status?: 'active' | 'inactive';
   notes?: string | null;
+  /** 1–28; null = the account's billing day. */
+  billing_day?: number | null;
 }
 
 /** Add (no id) or edit a property. */
@@ -376,6 +395,10 @@ export interface UnitBody {
   default_deposit?: string | null;
   status?: 'vacant' | 'reserved' | 'maintenance' | 'occupied';
   notes?: string | null;
+  /** 1–28; null = the property's / account's billing day. Omit to leave unchanged. */
+  billing_day?: number | null;
+  /** Metered utilities: by meter or a fixed amount a month. Omit to leave unchanged. */
+  utilities?: Array<{ charge_code: string; billing_type: 'metered' | 'fixed'; amount?: string | null }>;
 }
 
 /** Add a unit to a property (no unitId) or edit one. */

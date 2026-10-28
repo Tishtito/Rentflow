@@ -183,3 +183,16 @@ export async function downloadPortalInvoicePdf(api: ApiClient, invoice: Pick<Inv
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** Save one of my payment receipts as a PDF. */
+export async function downloadPortalReceipt(api: ApiClient, payment: Pick<TenantPayment, 'id' | 'receipt_number'>): Promise<void> {
+  const blob = await api.download(`/api/portal/payments/${payment.id}/receipt`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${payment.receipt_number ?? `receipt-${payment.id}`}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

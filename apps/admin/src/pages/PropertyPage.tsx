@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAccount, useCan, useChargeRates, useMoveIn, useProperty, useUnits } from '@rentflow/api';
-import { cn, formatAmount, formatDate, toCents, type Unit } from '@rentflow/core';
+import { cn, effectiveBillingDay, formatAmount, formatDate, ordinal, toCents, type Unit } from '@rentflow/core';
 import {
   Badge,
   Button,
@@ -60,6 +60,8 @@ export function PropertyPage() {
   if (property.isPending) return <LoadingState />;
   if (property.isError) return <ErrorState message={property.error.message} onRetry={() => void property.refetch()} />;
   const p = property.data;
+  const accountDay = account.data?.billing_day ?? 5;
+  const propertyDay = effectiveBillingDay(null, p.billing_day, accountDay);
   const panelUnit = panel && 'unitId' in panel ? list.find((u) => u.id === panel.unitId) : undefined;
 
   return (
@@ -67,7 +69,13 @@ export function PropertyPage() {
       <PageHeader
         breadcrumb={[{ label: 'Properties', to: '/admin/properties' }, { label: p.name }]}
         title={p.name}
-        badge={p.status === 'inactive' ? <Badge>Inactive</Badge> : undefined}
+        badge={
+          p.status === 'inactive' ? (
+            <Badge>Inactive</Badge>
+          ) : propertyDay !== accountDay ? (
+            <Badge tone="info">Bills on the {ordinal(propertyDay)}</Badge>
+          ) : undefined
+        }
         subtitle={
           <>
             {[[p.town, p.county].filter(Boolean).join(', '), p.address, p.caretaker && `Looked after by ${p.caretaker.name}`, `${p.units_count ?? list.length} units`].filter(Boolean).join(' · ')}
@@ -158,7 +166,14 @@ export function PropertyPage() {
                   {
                     key: 'next',
                     header: 'Next bill',
-                    cell: (u) => (u.current_lease ? formatDate(u.current_lease.next_billing_date) : <span className="text-muted">—</span>),
+                    cell: (u) => (
+                      <>
+                        {u.current_lease ? formatDate(u.current_lease.next_billing_date) : <span className="text-muted">—</span>}
+                        {u.billing_day != null && u.billing_day !== propertyDay && (
+                          <span className="block text-xs text-muted">Bills on the {ordinal(u.billing_day)}</span>
+                        )}
+                      </>
+                    ),
                   },
                   {
                     key: 'balance',
@@ -197,14 +212,19 @@ export function PropertyPage() {
         </section>
 
         {panel?.kind === 'property' && <PropertyPanel property={p} onClose={() => setPanel(null)} />}
-        {panel?.kind === 'add-unit' && <UnitPanel propertyId={id} onClose={() => setPanel(null)} />}
-        {panel?.kind === 'unit' && panelUnit && <UnitPanel key={panelUnit.id} propertyId={id} unit={panelUnit} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'add-unit' && <UnitPanel propertyId={id} inheritedBillingDay={propertyDay} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'unit' && panelUnit && (
+          <UnitPanel key={panelUnit.id} propertyId={id} unit={panelUnit} inheritedBillingDay={propertyDay} onClose={() => setPanel(null)} />
+        )}
         {panel?.kind === 'move-in' && panelUnit && (
           <MoveInPanel
             key={panelUnit.id}
             unit={panelUnit}
-            billingDay={account.data?.billing_day ?? 5}
-            meters={(panelUnit.meters ?? []).map((m) => {
+            billingDay={panelUnit.effective_billing_day ?? propertyDay}
+            meters={(panelUnit.meters ?? [])
+              // A utility billed a fixed amount needs no opening reading.
+              .filter((m) => panelUnit.utilities?.find((u) => u.charge_code === m.charge_code)?.billing_type !== 'fixed')
+              .map((m) => {
               const info = chargeInfo(rates.data, m.charge_code);
               return { id: m.id, label: info.label, unit_of_measure: info.unit || 'units' };
             })}
