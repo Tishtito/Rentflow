@@ -1,7 +1,19 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { MessagePlan } from '@rentflow/core';
 import { ApiError, downloadPaymentReceipt, useApi, usePayments, useRecordPayment } from '@rentflow/api';
-import { Button, Card, ErrorState, LoadingState, Notice, PageHeader, PaymentsTable, RecordPaymentPanel, TextField } from '@rentflow/ui';
+import {
+  Button,
+  Card,
+  ErrorState,
+  LoadingState,
+  MessagesNotice,
+  Notice,
+  PageHeader,
+  PaymentsTable,
+  RecordPaymentPanel,
+  TextField,
+} from '@rentflow/ui';
 
 /** Fields the panel shows errors beside; anything else goes in the notice at the top. */
 const formFields = ['lease_id', 'amount', 'paid_at', 'reference'];
@@ -20,7 +32,7 @@ export function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [panelOpen, setPanelOpen] = useState(params.has('lease'));
   const [leaseId, setLeaseId] = useState(params.get('lease') ?? '');
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<MessagePlan[] | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const api = useApi();
   const invoiceId = positiveInt(params.get('invoice'));
@@ -31,7 +43,11 @@ export function PaymentsPage() {
 
   const apiError = record.error instanceof ApiError ? record.error : null;
   const fieldErrors = apiError ? Object.fromEntries(Object.keys(apiError.errors).map((k) => [k, apiError.field(k)])) : undefined;
-  const otherErrors = apiError ? Object.keys(apiError.errors).filter((k) => !formFields.includes(k)).map((k) => apiError.field(k)) : [];
+  const otherErrors = apiError
+    ? Object.keys(apiError.errors)
+        .filter((k) => !formFields.includes(k))
+        .map((k) => apiError.field(k))
+    : [];
   const meta = payments.data?.meta;
 
   const closePanel = () => {
@@ -49,7 +65,7 @@ export function PaymentsPage() {
           <Button
             variant="primary"
             onClick={() => {
-              setSaved(false);
+              setSaved(null);
               setPanelOpen(true);
             }}
           >
@@ -59,9 +75,9 @@ export function PaymentsPage() {
       />
 
       {saved && (
-        <Notice tone="success" title="Payment recorded">
-          The bill's balance and status are updated, and the tenant is sent a receipt.
-        </Notice>
+        <MessagesNotice title="Payment recorded" messages={saved}>
+          <span>The bill's balance and status are updated. Receipt:</span>
+        </MessagesNotice>
       )}
       {downloadError && <Notice tone="danger">{downloadError}</Notice>}
 
@@ -78,14 +94,14 @@ export function PaymentsPage() {
                 invoiceHref={(p) => `/admin/bills/${p.invoice_id}`}
                 onDownloadReceipt={(p) => {
                   setDownloadError(null);
-                  downloadPaymentReceipt(api, p).catch((e: Error) => setDownloadError(`Couldn't download ${p.receipt_number}: ${e.message}`));
+                  downloadPaymentReceipt(api, p).catch((e: Error) =>
+                    setDownloadError(`Couldn't download ${p.receipt_number}: ${e.message}`),
+                  );
                 }}
               />
               {meta && (
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 text-[13px] text-muted">
-                  <span className="num">
-                    {meta.total === 0 ? 'No payments yet' : `Showing ${meta.from}–${meta.to} of ${meta.total}`}
-                  </span>
+                  <span className="num">{meta.total === 0 ? 'No payments yet' : `Showing ${meta.from}–${meta.to} of ${meta.total}`}</span>
                   <span className="flex gap-2">
                     <Button disabled={page <= 1 || payments.isFetching} onClick={() => setPage((p) => p - 1)}>
                       Newer
@@ -136,8 +152,8 @@ export function PaymentsPage() {
                   paid_at: input.paid_at,
                 },
                 {
-                  onSuccess: () => {
-                    setSaved(true);
+                  onSuccess: (sent) => {
+                    setSaved(sent.messages);
                     setPage(1);
                     closePanel();
                   },

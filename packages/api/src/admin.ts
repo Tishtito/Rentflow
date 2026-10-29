@@ -23,6 +23,7 @@ import type {
   Unit,
   WhatsAppConnection,
   Wrapped,
+  SentResponse,
 } from '@rentflow/core';
 import { ApiError, query, type ApiClient } from './client';
 import { useApi } from './context';
@@ -165,7 +166,7 @@ export function useRecordPayment() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: RecordPaymentBody) => api.post<{ message: string }>('/api/admin/payments', body),
+    mutationFn: (body: RecordPaymentBody) => api.post<SentResponse>('/api/admin/payments', body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin', 'payments'] });
       void qc.invalidateQueries({ queryKey: ['admin', 'invoices'] });
@@ -199,7 +200,7 @@ export function useInvoices(filters: InvoiceFilters = {}) {
 /** Send a bill again (email / WhatsApp; default the tenant's usual channels). */
 export const useResendInvoice = () =>
   useAdminWrite((api, { id, channels }: { id: number; channels?: Array<'email' | 'whatsapp'> }) =>
-    api.post(`/api/admin/invoices/${id}/resend`, channels ? { channels } : {}),
+    api.post<SentResponse>(`/api/admin/invoices/${id}/resend`, channels ? { channels } : {}),
   );
 
 /** Void a wrong bill (latest bill of its lease, nothing paid yet); the next billing run bills the period again. */
@@ -318,7 +319,10 @@ function refreshAdminData(qc: ReturnType<typeof useQueryClient>) {
 }
 
 /** A write, then refetch admin data. `includingMe`: it may change the logged-in user's own roles/permissions. */
-function useAdminWrite<TInput>(write: (api: ReturnType<typeof useApi>, input: TInput) => Promise<unknown>, includingMe = false) {
+function useAdminWrite<TInput, TResult = unknown>(
+  write: (api: ReturnType<typeof useApi>, input: TInput) => Promise<TResult>,
+  includingMe = false,
+) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
@@ -435,7 +439,9 @@ export interface MoveInBody {
 }
 
 export const useMoveIn = () =>
-  useAdminWrite((api, { unitId, ...body }: MoveInBody & { unitId: number }) => api.post(`/api/admin/units/${unitId}/move-in`, body));
+  useAdminWrite((api, { unitId, ...body }: MoveInBody & { unitId: number }) =>
+    api.post<SentResponse>(`/api/admin/units/${unitId}/move-in`, body),
+  );
 
 export const useEndLease = () =>
   useAdminWrite((api, { leaseId, end_date }: { leaseId: number; end_date: string }) =>
@@ -474,7 +480,8 @@ export interface TenantContactBody {
 export const useUpdateTenant = () =>
   useAdminWrite((api, { id, ...body }: TenantContactBody & { id: number }) => api.put(`/api/admin/tenants/${id}`, body));
 
-export const useResendInvitation = () => useAdminWrite((api, tenantId: number) => api.post(`/api/admin/tenants/${tenantId}/invitation`));
+export const useResendInvitation = () =>
+  useAdminWrite((api, tenantId: number) => api.post<SentResponse>(`/api/admin/tenants/${tenantId}/invitation`));
 
 /* ---------- Billing settings: charge rates + cycle ---------- */
 

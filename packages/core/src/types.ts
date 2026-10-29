@@ -313,7 +313,32 @@ export interface MeterSetup {
 /** GET /api/admin/setup: the getting-started checklist. */
 export interface SetupProgress {
   complete: boolean;
-  steps: Array<{ key: 'property' | 'prices' | 'units' | 'meters' | 'billing_day' | 'tenants'; title: string; done: boolean; detail: string; link: string }>;
+  steps: Array<{
+    key: 'property' | 'prices' | 'units' | 'meters' | 'billing_day' | 'tenants';
+    title: string;
+    done: boolean;
+    detail: string;
+    link: string;
+  }>;
+}
+
+/**
+ * One channel of a send action (invitation, bill, receipt, resend), from the 202 response's `messages`.
+ * `sending` = queued to go out (not yet delivered); otherwise `note` says why it was skipped.
+ * Resend-all on the platform gives `count` instead of `to`.
+ */
+export interface MessagePlan {
+  channel: Channel;
+  to?: string | null;
+  count?: number;
+  sending: boolean;
+  note?: string | null;
+}
+
+/** 202 body of a send action. */
+export interface SentResponse {
+  message: string;
+  messages: MessagePlan[];
 }
 
 export interface NotificationDelivery {
@@ -453,10 +478,31 @@ export interface PlatformAccountDetail {
   created_at: ISODateTime;
   counts: { properties: number; units: number; occupied_units: number; tenants: number; active_leases: number };
   balance_outstanding: Money;
-  team: Array<{ id: number; name: string; email: string; phone: string | null; status: 'active' | 'invited' | 'suspended'; last_login_at: ISODateTime | null; is_owner: boolean }>;
-  billing_runs: Array<{ id: number; run_date: ISODate; trigger: 'scheduled' | 'manual'; status: BillingRunStatus; invoices_created: number; leases_skipped: number; finished_at: ISODateTime | null }>;
+  team: Array<{
+    id: number;
+    name: string;
+    email: string;
+    phone: string | null;
+    status: 'active' | 'invited' | 'suspended';
+    last_login_at: ISODateTime | null;
+    is_owner: boolean;
+  }>;
+  billing_runs: Array<{
+    id: number;
+    run_date: ISODate;
+    trigger: 'scheduled' | 'manual';
+    status: BillingRunStatus;
+    invoices_created: number;
+    leases_skipped: number;
+    finished_at: ISODateTime | null;
+  }>;
   deliveries_7d: Array<{ channel: Channel; status: DeliveryStatus; count: number }>;
-  whatsapp: { status: WhatsAppStatus; display_phone_number: string | null; verified_name: string | null; verified_at: ISODateTime | null } | null;
+  whatsapp: {
+    status: WhatsAppStatus;
+    display_phone_number: string | null;
+    verified_name: string | null;
+    verified_at: ISODateTime | null;
+  } | null;
   activity: AuditEntry[];
 }
 
@@ -468,7 +514,13 @@ export interface PlatformOverview {
   tenants: number;
   month: { from: ISODate; bills_count: number; billed: Money; collected: Money };
   balance_outstanding: Money;
-  attention: { failed_deliveries_24h: number; failed_deliveries: number; billing_runs_with_problems_7d: number; whatsapp_disabled: number; failed_jobs: number };
+  attention: {
+    failed_deliveries_24h: number;
+    failed_deliveries: number;
+    billing_runs_with_problems_7d: number;
+    whatsapp_disabled: number;
+    failed_jobs: number;
+  };
   recent_activity: AuditEntry[];
 }
 
@@ -601,8 +653,7 @@ export interface PortalHome {
 
 /** POST /api/portal/auth/login: logged in, or several landlords matched and the person must choose. */
 export type PortalLoginResult =
-  | { choose_home: false; tenant: PortalTenant }
-  | { choose_home: true; homes: Array<{ tenant_id: number; account_name: string | null }> };
+  { choose_home: false; tenant: PortalTenant } | { choose_home: true; homes: Array<{ tenant_id: number; account_name: string | null }> };
 
 export type BillingRunStatus = 'running' | 'completed' | 'completed_with_errors' | 'failed';
 

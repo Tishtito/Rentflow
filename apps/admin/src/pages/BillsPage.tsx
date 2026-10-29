@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { downloadInvoicePdf, useApi, useCan, useInvoices, useProperties } from '@rentflow/api';
-import { formatAmount, formatDate, formatKES, formatPeriod, toCents, type Invoice, type InvoiceListStatus } from '@rentflow/core';
+import {
+  formatAmount,
+  formatDate,
+  formatKES,
+  formatPeriod,
+  toCents,
+  type Invoice,
+  type InvoiceListStatus,
+  type MessagePlan,
+} from '@rentflow/core';
 import {
   Badge,
   CardIcon,
@@ -13,6 +22,7 @@ import {
   InvoiceStatusBadge,
   LoadingState,
   MailIcon,
+  MessagesNotice,
   Notice,
   PageHeader,
   Pager,
@@ -40,7 +50,7 @@ export function BillsPage() {
   const [debounced, setDebounced] = useState(search.trim());
   const [page, setPage] = useState(1);
   const [resending, setResending] = useState<Invoice | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ title: string; messages: MessagePlan[] } | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -86,7 +96,7 @@ export function BillsPage() {
           tone={summary && toCents(summary.outstanding) > 0 ? 'warn' : 'default'}
         />
       </StatGrid>
-      {notice && <Notice tone="success">{notice}</Notice>}
+      {notice && <MessagesNotice title={notice.title} messages={notice.messages} />}
       {downloadError && <Notice tone="danger">{downloadError}</Notice>}
       {/* The panel sits beside the table on wide screens and wraps below it on narrow ones. */}
       <div className="flex flex-wrap items-start gap-6">
@@ -218,8 +228,8 @@ export function BillsPage() {
           <ResendBillPanel
             bill={resending}
             onClose={() => setResending(null)}
-            onSent={() => {
-              setNotice(`${resending.invoice_number} is being sent again.`);
+            onSent={(sent) => {
+              setNotice({ title: `${resending.invoice_number} is being sent again.`, messages: sent.messages });
               setResending(null);
             }}
           />

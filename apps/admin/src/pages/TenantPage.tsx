@@ -10,6 +10,7 @@ import {
   DataTable,
   ErrorState,
   EyeIcon,
+  MessagesNotice,
   InvoiceStatusBadge,
   LeaseStatusBadge,
   LoadingState,
@@ -52,7 +53,15 @@ export function TenantPage() {
       <PageHeader
         breadcrumb={[{ label: 'Tenants', to: '/admin/tenants' }, { label: t.full_name }]}
         title={t.full_name}
-        badge={t.status === 'active' ? <Badge tone="success">Portal active</Badge> : t.status === 'invited' ? <Badge tone="info">Invited</Badge> : <Badge>Inactive</Badge>}
+        badge={
+          t.status === 'active' ? (
+            <Badge tone="success">Portal active</Badge>
+          ) : t.status === 'invited' ? (
+            <Badge tone="info">Invited</Badge>
+          ) : (
+            <Badge>Inactive</Badge>
+          )
+        }
         actions={
           canEdit && (
             <>
@@ -72,7 +81,11 @@ export function TenantPage() {
         }
       />
 
-      {invite.isSuccess && <Notice tone="success">Invitation emailed to {t.email}. The link works for 3 days.</Notice>}
+      {invite.data && (
+        <MessagesNotice title="Invitation sent" messages={invite.data.messages}>
+          <span>The link works for 3 days.</span>
+        </MessagesNotice>
+      )}
       {inviteError && <Notice tone="danger">{inviteError}</Notice>}
 
       <div className="flex flex-wrap items-start gap-6">
@@ -96,15 +109,25 @@ export function TenantPage() {
             />
           </Card>
           <Card title="Payments" id="payments">
-            {(t.payments ?? []).length ? <PaymentHistoryList payments={t.payments ?? []} /> : <span className="text-sm text-muted">No payments yet.</span>}
+            {(t.payments ?? []).length ? (
+              <PaymentHistoryList payments={t.payments ?? []} />
+            ) : (
+              <span className="text-sm text-muted">No payments yet.</span>
+            )}
           </Card>
         </div>
 
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
           {panel === 'edit' && <EditTenantPanel tenant={t} onClose={() => setPanel(null)} />}
-          {panel === 'end' && lease && <EndLeasePanel leaseId={lease.id} unit={lease.unit_number ?? ''} startDate={lease.start_date} onClose={() => setPanel(null)} />}
+          {panel === 'end' && lease && (
+            <EndLeasePanel leaseId={lease.id} unit={lease.unit_number ?? ''} startDate={lease.start_date} onClose={() => setPanel(null)} />
+          )}
 
-          <Card title={lease ? `House ${lease.unit_number}` : 'No current home'} description={lease?.property_name ?? 'This tenant has moved out.'} id="lease">
+          <Card
+            title={lease ? `House ${lease.unit_number}` : 'No current home'}
+            description={lease?.property_name ?? 'This tenant has moved out.'}
+            id="lease"
+          >
             {balance != null && (
               <span className={cn('num font-display text-[28px] font-bold', toCents(balance) > 0 ? 'text-warn-strong' : 'text-brand')}>
                 {toCents(balance) < 0 ? `${formatKES(-toCents(balance) / 100)} credit` : formatKES(balance)}
@@ -199,13 +222,32 @@ function EditTenantPanel({ tenant, onClose }: { tenant: AdminTenant; onClose: ()
           <TextField label="First name" required value={form.first_name} onChange={set('first_name')} error={errors.first_name} />
           <TextField label="Last name" required value={form.last_name} onChange={set('last_name')} error={errors.last_name} />
           <TextField label="Phone" type="tel" required value={form.phone} onChange={set('phone')} error={errors.phone} />
-          <TextField label="WhatsApp" type="tel" hint="If different" value={form.whatsapp_phone} onChange={set('whatsapp_phone')} error={errors.whatsapp_phone} />
+          <TextField
+            label="WhatsApp"
+            type="tel"
+            hint="If different"
+            value={form.whatsapp_phone}
+            onChange={set('whatsapp_phone')}
+            error={errors.whatsapp_phone}
+          />
         </div>
         <TextField label="Email" type="email" value={form.email} onChange={set('email')} error={errors.email} />
-        <TextField label="National ID" inputMode="numeric" value={form.national_id} onChange={set('national_id')} error={errors.national_id} />
+        <TextField
+          label="National ID"
+          inputMode="numeric"
+          value={form.national_id}
+          onChange={set('national_id')}
+          error={errors.national_id}
+        />
         <div className="grid grid-cols-2 gap-3">
           <TextField label="Next of kin" value={form.next_of_kin_name} onChange={set('next_of_kin_name')} error={errors.next_of_kin_name} />
-          <TextField label="Their phone" type="tel" value={form.next_of_kin_phone} onChange={set('next_of_kin_phone')} error={errors.next_of_kin_phone} />
+          <TextField
+            label="Their phone"
+            type="tel"
+            value={form.next_of_kin_phone}
+            onChange={set('next_of_kin_phone')}
+            error={errors.next_of_kin_phone}
+          />
         </div>
         <Button type="submit" variant="primary" size="lg" disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save'}
@@ -231,8 +273,18 @@ function EndLeasePanel({ leaseId, unit, startDate, onClose }: { leaseId: number;
         }}
       >
         {message && <Notice tone="danger">{message}</Notice>}
-        <TextField label="Last day in the unit" type="date" required min={startDate} value={date} onChange={(e) => setDate(e.target.value)} error={errors.end_date} />
-        <span className="text-xs text-muted">What the tenant still owes (or their credit) stays on their statement. No more bills are created.</span>
+        <TextField
+          label="Last day in the unit"
+          type="date"
+          required
+          min={startDate}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          error={errors.end_date}
+        />
+        <span className="text-xs text-muted">
+          What the tenant still owes (or their credit) stays on their statement. No more bills are created.
+        </span>
         <Button type="submit" variant="danger-outline" size="lg" disabled={end.isPending}>
           {end.isPending ? 'Saving…' : 'End lease'}
         </Button>

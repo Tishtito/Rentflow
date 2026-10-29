@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { downloadInvoicePdf, useApi, useCan, useInvoice, usePayments } from '@rentflow/api';
-import { formatDateTime, formatKES, toCents } from '@rentflow/core';
+import { formatDateTime, formatKES, toCents, type MessagePlan } from '@rentflow/core';
 import {
   Badge,
   BillDocument,
@@ -12,6 +12,7 @@ import {
   ErrorState,
   InvoiceStatusBadge,
   LoadingState,
+  MessagesNotice,
   Notice,
   PageHeader,
   PaymentHistoryList,
@@ -27,7 +28,7 @@ export function BillDetailPage() {
   const api = useApi();
   const can = useCan();
   const [panel, setPanel] = useState<'resend' | 'void' | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ title: string; messages: MessagePlan[] } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -82,7 +83,7 @@ export function BillDetailPage() {
           </>
         }
       />
-      {notice && <Notice tone="success">{notice}</Notice>}
+      {notice && <MessagesNotice title={notice.title} messages={notice.messages} />}
       {downloadError && <Notice tone="danger">{downloadError}</Notice>}
       {isVoid && (
         <Notice tone="warn" title="This bill is void">
@@ -106,9 +107,9 @@ export function BillDetailPage() {
             <ResendBillPanel
               bill={bill}
               onClose={() => setPanel(null)}
-              onSent={() => {
+              onSent={(sent) => {
                 setPanel(null);
-                setNotice('The bill is being sent again. It shows under Messages.');
+                setNotice({ title: 'The bill is being sent again. It shows under Messages.', messages: sent.messages });
               }}
             />
           )}
