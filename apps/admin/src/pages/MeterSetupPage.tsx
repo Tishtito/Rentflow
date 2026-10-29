@@ -118,6 +118,16 @@ export function MeterSetupPage() {
                     </th>
                     {s.charges.map((c) => {
                       const fitted = u.meters[c.charge_code];
+                      if (!fitted && u.fixed?.includes(c.charge_code)) {
+                        return (
+                          <td key={c.charge_code} colSpan={2} className="px-3 py-2.5">
+                            <span className="flex items-center gap-2">
+                              <Badge>Fixed amount</Badge>
+                              <span className="text-muted">No meter needed</span>
+                            </span>
+                          </td>
+                        );
+                      }
                       if (fitted) {
                         return (
                           <td key={c.charge_code} colSpan={2} className="px-3 py-2.5">
@@ -193,6 +203,17 @@ export function MeterSetupPage() {
                         {c.unit_of_measure && <span className="font-normal text-muted"> ({c.unit_of_measure})</span>}
                       </span>
                     );
+                    if (!fitted && u.fixed?.includes(c.charge_code)) {
+                      return (
+                        <div key={c.charge_code} className="flex flex-col gap-1 rounded-md bg-canvas p-3">
+                          {heading}
+                          <span className="flex items-center gap-2 text-sm">
+                            <Badge>Fixed amount</Badge>
+                            <span className="text-muted">No meter needed</span>
+                          </span>
+                        </div>
+                      );
+                    }
                     if (fitted) {
                       return (
                         <div key={c.charge_code} className="flex flex-col gap-1 rounded-md bg-canvas p-3">

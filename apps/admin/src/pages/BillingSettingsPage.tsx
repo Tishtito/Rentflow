@@ -11,7 +11,7 @@ import {
   useStartBillingRun,
   useUnits,
 } from '@rentflow/api';
-import type { ChargeRate } from '@rentflow/core';
+import { ordinal, type ChargeRate } from '@rentflow/core';
 import {
   BillingRunsTable,
   Button,
@@ -304,12 +304,7 @@ function AddChargePanel({
 }
 
 /** 1st – 28th: the billing day must exist in every month. */
-const BILLING_DAYS = Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: ordinal(i + 1) }));
-
-function ordinal(n: number): string {
-  const suffix = n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th';
-  return `${n}${suffix} of the month`;
-}
+const BILLING_DAYS = Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `${ordinal(i + 1)} of the month` }));
 
 function CycleSettings() {
   const account = useAccount();
@@ -331,7 +326,7 @@ function CycleSettings() {
     <Card
       id="cycle"
       title="Billing day"
-      description="Every lease is billed on this day of the month: rent for the coming month and meter usage up to that day"
+      description="Leases are billed on this day of the month: rent for the coming month and meter usage up to that day. A property or a single unit can have its own day (edit the property or unit)."
       className="min-w-0 flex-[1_1_320px] gap-4"
     >
       {!form ? (

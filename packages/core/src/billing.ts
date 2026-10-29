@@ -3,7 +3,10 @@
  * app/Services/Billing/BillingCalendar.php. Change the rules THERE first, then here, and keep
  * billing.test.ts in step with tests/Unit/BillingCalendarTest.php.
  *
- *  - Each landlord bills on one day of the month (accounts.billing_day, 1–28, default 5).
+ *  - Each lease bills on one day of the month (1–28): its unit's billing_day, else its property's, else
+ *    the landlord's (accounts.billing_day, default 5) — effectiveBillingDay().
+ *  - Changing the day for a let unit moves its next bill to the first new billing day on or after the old
+ *    one; that bill also charges the days in between (gapRent, same ÷ 30 rule).
  *  - Move-in rent = monthly rent × days(move-in → next billing day) ÷ 30, rounded to the shilling,
  *    never more than a month; moving in ON the billing day = a full month.
  *
@@ -62,13 +65,59 @@ export function moveInRent(monthlyRentCents: number, moveInDate: string, billing
   }
 
   const days = daysBetween(start, firstBillingDate);
-  const shillings = Math.round(((monthlyRentCents / 100) * days) / PRORATION_DAYS);
+  return { periodStart: start, periodEnd, days, amountCents: prorate(monthlyRentCents, days), fullMonth: false, firstBillingDate };
+}
+
+/** The day a unit bills on: its own, else its property's, else the account's. */
+export function effectiveBillingDay(
+  unitDay: number | null | undefined,
+  propertyDay: number | null | undefined,
+  accountDay: number | null | undefined,
+): number {
+  return unitDay ?? propertyDay ?? accountDay ?? DEFAULT_BILLING_DAY;
+}
+
+/** First billing date on or AFTER the date: 5 Dec (day 20) → 20 Dec; 5 Dec (day 5) → 5 Dec. */
+export function billingDateOnOrAfter(date: string, billingDay: number): string {
+  return nextBillingDateAfter(iso(fromDayNumber(dayNumber(parse(date)) - 1)), billingDay);
+}
+
+/** rent × days ÷ 30, rounded to the shilling, never more than one month. */
+function prorate(monthlyRentCents: number, days: number): number {
+  return Math.min(monthlyRentCents, Math.round(((monthlyRentCents / 100) * days) / PRORATION_DAYS) * 100);
+}
+
+export interface RentGap {
+  periodStart: string; // the old billing date
+  periodEnd: string; // day before the new one
+  days: number;
+  amountCents: number;
+}
+
+/** Rent for the days between the old and new billing date after a billing-day change (from inclusive, until exclusive). */
+export function gapRent(monthlyRentCents: number, from: string, until: string): RentGap {
+  const days = daysBetween(from, until);
+  if (days <= 0) throw new RangeError('A rent gap must be at least one day long.');
   return {
-    periodStart: start,
-    periodEnd,
+    periodStart: iso(parse(from)),
+    periodEnd: iso(fromDayNumber(dayNumber(parse(until)) - 1)),
     days,
-    amountCents: Math.min(monthlyRentCents, shillings * 100),
-    fullMonth: false,
-    firstBillingDate,
+    amountCents: prorate(monthlyRentCents, days),
   };
+}
+
+/** What changing a let unit's billing day does to its next bill: the new date and the gap (null = no gap). */
+export function billingDayChange(
+  nextBillingDate: string,
+  newBillingDay: number,
+  monthlyRentCents: number,
+): { nextBillingDate: string; gap: RentGap | null } {
+  const next = billingDateOnOrAfter(nextBillingDate, newBillingDay);
+  return { nextBillingDate: next, gap: next > nextBillingDate ? gapRent(monthlyRentCents, nextBillingDate, next) : null };
+}
+
+/** 1 → "1st", 22 → "22nd". */
+export function ordinal(n: number): string {
+  const suffix = n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th';
+  return `${n}${suffix}`;
 }

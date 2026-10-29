@@ -23,6 +23,7 @@ import type {
   Unit,
   WhatsAppConnection,
   Wrapped,
+  SentResponse,
 } from '@rentflow/core';
 import { ApiError, query, type ApiClient } from './client';
 import { useApi } from './context';
@@ -165,7 +166,7 @@ export function useRecordPayment() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: RecordPaymentBody) => api.post<{ message: string }>('/api/admin/payments', body),
+    mutationFn: (body: RecordPaymentBody) => api.post<SentResponse>('/api/admin/payments', body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin', 'payments'] });
       void qc.invalidateQueries({ queryKey: ['admin', 'invoices'] });
@@ -199,7 +200,7 @@ export function useInvoices(filters: InvoiceFilters = {}) {
 /** Send a bill again (email / WhatsApp; default the tenant's usual channels). */
 export const useResendInvoice = () =>
   useAdminWrite((api, { id, channels }: { id: number; channels?: Array<'email' | 'whatsapp'> }) =>
-    api.post(`/api/admin/invoices/${id}/resend`, channels ? { channels } : {}),
+    api.post<SentResponse>(`/api/admin/invoices/${id}/resend`, channels ? { channels } : {}),
   );
 
 /** Void a wrong bill (latest bill of its lease, nothing paid yet); the next billing run bills the period again. */
@@ -213,6 +214,19 @@ export async function downloadInvoicePdf(api: ApiClient, invoice: Pick<Invoice, 
   const a = document.createElement('a');
   a.href = url;
   a.download = `${invoice.invoice_number}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Download a payment's receipt PDF and save it (same file the tenant gets). */
+export async function downloadPaymentReceipt(api: ApiClient, payment: Pick<Payment, 'id' | 'receipt_number'>): Promise<void> {
+  const blob = await api.download(`/api/admin/payments/${payment.id}/receipt`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${payment.receipt_number ?? `receipt-${payment.id}`}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -272,6 +286,10 @@ export interface SaveWhatsAppBody {
   access_token?: string;
   app_secret?: string;
   template_name?: string;
+  /** The tenant invitation template; empty = rentflow_tenant_invitation. */
+  invitation_template_name?: string;
+  /** The payment receipt template; empty = rentflow_payment_receipt. */
+  receipt_template_name?: string;
   template_language?: string;
 }
 
@@ -301,7 +319,10 @@ function refreshAdminData(qc: ReturnType<typeof useQueryClient>) {
 }
 
 /** A write, then refetch admin data. `includingMe`: it may change the logged-in user's own roles/permissions. */
-function useAdminWrite<TInput>(write: (api: ReturnType<typeof useApi>, input: TInput) => Promise<unknown>, includingMe = false) {
+function useAdminWrite<TInput, TResult = unknown>(
+  write: (api: ReturnType<typeof useApi>, input: TInput) => Promise<TResult>,
+  includingMe = false,
+) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
@@ -359,6 +380,8 @@ export interface PropertyBody {
   caretaker_id?: number | null;
   status?: 'active' | 'inactive';
   notes?: string | null;
+  /** 1–28; null = the account's billing day. */
+  billing_day?: number | null;
 }
 
 /** Add (no id) or edit a property. */
@@ -376,6 +399,10 @@ export interface UnitBody {
   default_deposit?: string | null;
   status?: 'vacant' | 'reserved' | 'maintenance' | 'occupied';
   notes?: string | null;
+  /** 1–28; null = the property's / account's billing day. Omit to leave unchanged. */
+  billing_day?: number | null;
+  /** Metered utilities: by meter or a fixed amount a month. Omit to leave unchanged. */
+  utilities?: Array<{ charge_code: string; billing_type: 'metered' | 'fixed'; amount?: string | null }>;
 }
 
 /** Add a unit to a property (no unitId) or edit one. */
@@ -412,7 +439,9 @@ export interface MoveInBody {
 }
 
 export const useMoveIn = () =>
-  useAdminWrite((api, { unitId, ...body }: MoveInBody & { unitId: number }) => api.post(`/api/admin/units/${unitId}/move-in`, body));
+  useAdminWrite((api, { unitId, ...body }: MoveInBody & { unitId: number }) =>
+    api.post<SentResponse>(`/api/admin/units/${unitId}/move-in`, body),
+  );
 
 export const useEndLease = () =>
   useAdminWrite((api, { leaseId, end_date }: { leaseId: number; end_date: string }) =>
@@ -451,7 +480,8 @@ export interface TenantContactBody {
 export const useUpdateTenant = () =>
   useAdminWrite((api, { id, ...body }: TenantContactBody & { id: number }) => api.put(`/api/admin/tenants/${id}`, body));
 
-export const useResendInvitation = () => useAdminWrite((api, tenantId: number) => api.post(`/api/admin/tenants/${tenantId}/invitation`));
+export const useResendInvitation = () =>
+  useAdminWrite((api, tenantId: number) => api.post<SentResponse>(`/api/admin/tenants/${tenantId}/invitation`));
 
 /* ---------- Billing settings: charge rates + cycle ---------- */
 
