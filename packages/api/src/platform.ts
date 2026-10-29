@@ -12,12 +12,13 @@ import type {
   PlatformOverview,
   PlatformWhatsAppNumber,
   Role,
+  SentResponse,
 } from '@rentflow/core';
 import { query, type ApiClient } from './client';
 import { useApi } from './context';
 
 /** Super admin (platform) API: /api/platform/*. Every write refetches all platform data. */
-function usePlatformWrite<TInput>(write: (api: ApiClient, input: TInput) => Promise<unknown>) {
+function usePlatformWrite<TInput, TResult = unknown>(write: (api: ApiClient, input: TInput) => Promise<TResult>) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
@@ -28,7 +29,10 @@ function usePlatformWrite<TInput>(write: (api: ApiClient, input: TInput) => Prom
 
 export function usePlatformOverview() {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'overview'], queryFn: () => api.get<{ data: PlatformOverview }>('/api/platform/overview').then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'overview'],
+    queryFn: () => api.get<{ data: PlatformOverview }>('/api/platform/overview').then((r) => r.data),
+  });
 }
 
 /* ---------- Landlord accounts ---------- */
@@ -44,7 +48,10 @@ export function usePlatformAccounts(filters: { search?: string; status?: string;
 
 export function usePlatformAccount(id: number) {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'account', id], queryFn: () => api.get<{ data: PlatformAccountDetail }>(`/api/platform/accounts/${id}`).then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'account', id],
+    queryFn: () => api.get<{ data: PlatformAccountDetail }>(`/api/platform/accounts/${id}`).then((r) => r.data),
+  });
 }
 
 export interface CreateAccountBody {
@@ -68,13 +75,18 @@ export interface AccountProfileBody {
   invoice_prefix: string;
 }
 
-export const useUpdateAccount = () => usePlatformWrite((api, { id, ...body }: AccountProfileBody & { id: number }) => api.put(`/api/platform/accounts/${id}`, body));
+export const useUpdateAccount = () =>
+  usePlatformWrite((api, { id, ...body }: AccountProfileBody & { id: number }) => api.put(`/api/platform/accounts/${id}`, body));
 
 export const useAccountStatus = () =>
-  usePlatformWrite((api, { id, ...body }: { id: number; status: 'active' | 'suspended' | 'closed'; reason?: string }) => api.patch(`/api/platform/accounts/${id}/status`, body));
+  usePlatformWrite((api, { id, ...body }: { id: number; status: 'active' | 'suspended' | 'closed'; reason?: string }) =>
+    api.patch(`/api/platform/accounts/${id}/status`, body),
+  );
 
 export const useRunAccountBilling = () =>
-  usePlatformWrite((api, { id, run_date }: { id: number; run_date?: string }) => api.post(`/api/platform/accounts/${id}/billing-runs`, run_date ? { run_date } : {}));
+  usePlatformWrite((api, { id, run_date }: { id: number; run_date?: string }) =>
+    api.post(`/api/platform/accounts/${id}/billing-runs`, run_date ? { run_date } : {}),
+  );
 
 /* ---------- Billing runs ---------- */
 
@@ -109,40 +121,59 @@ export function usePlatformDeliveries(filters: { account_id?: number; status?: s
 
 export function useDeliveryStats() {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'delivery-stats'], queryFn: () => api.get<{ data: DeliveryStats }>('/api/platform/deliveries/stats').then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'delivery-stats'],
+    queryFn: () => api.get<{ data: DeliveryStats }>('/api/platform/deliveries/stats').then((r) => r.data),
+  });
 }
 
-export const useRetryDelivery = () => usePlatformWrite((api, id: number) => api.post(`/api/platform/deliveries/${id}/retry`));
+export const useRetryDelivery = () => usePlatformWrite((api, id: number) => api.post<SentResponse>(`/api/platform/deliveries/${id}/retry`));
 
 export const useRetryFailedDeliveries = () =>
-  usePlatformWrite((api, accountId: number | null) => api.post('/api/platform/deliveries/retry-failed', accountId ? { account_id: accountId } : {}));
+  usePlatformWrite((api, accountId: number | null) =>
+    api.post<SentResponse>('/api/platform/deliveries/retry-failed', accountId ? { account_id: accountId } : {}),
+  );
 
 export function usePlatformWhatsApp() {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'whatsapp'], queryFn: () => api.get<{ data: PlatformWhatsAppNumber[] }>('/api/platform/whatsapp-connections').then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'whatsapp'],
+    queryFn: () => api.get<{ data: PlatformWhatsAppNumber[] }>('/api/platform/whatsapp-connections').then((r) => r.data),
+  });
 }
 
 /* ---------- Built-in roles ---------- */
 
 export function useRoleTemplates() {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'role-templates'], queryFn: () => api.get<{ data: Role[] }>('/api/platform/role-templates').then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'role-templates'],
+    queryFn: () => api.get<{ data: Role[] }>('/api/platform/role-templates').then((r) => r.data),
+  });
 }
 
 export const useSaveRoleTemplate = () =>
-  usePlatformWrite((api, { id, permissions }: { id: number; permissions: string[] }) => api.put(`/api/platform/role-templates/${id}`, { permissions }));
+  usePlatformWrite((api, { id, permissions }: { id: number; permissions: string[] }) =>
+    api.put(`/api/platform/role-templates/${id}`, { permissions }),
+  );
 
 /* ---------- Platform admins ---------- */
 
 export function usePlatformAdmins() {
   const api = useApi();
-  return useQuery({ queryKey: ['platform', 'admins'], queryFn: () => api.get<{ data: PlatformAdmin[] }>('/api/platform/admins').then((r) => r.data) });
+  return useQuery({
+    queryKey: ['platform', 'admins'],
+    queryFn: () => api.get<{ data: PlatformAdmin[] }>('/api/platform/admins').then((r) => r.data),
+  });
 }
 
-export const useInvitePlatformAdmin = () => usePlatformWrite((api, body: { name: string; email: string }) => api.post('/api/platform/admins', body));
+export const useInvitePlatformAdmin = () =>
+  usePlatformWrite((api, body: { name: string; email: string }) => api.post('/api/platform/admins', body));
 
 export const usePlatformAdminStatus = () =>
-  usePlatformWrite((api, { id, status }: { id: number; status: 'active' | 'suspended' }) => api.patch(`/api/platform/admins/${id}/status`, { status }));
+  usePlatformWrite((api, { id, status }: { id: number; status: 'active' | 'suspended' }) =>
+    api.patch(`/api/platform/admins/${id}/status`, { status }),
+  );
 
 export const useResendPlatformAdminInvite = () => usePlatformWrite((api, id: number) => api.post(`/api/platform/admins/${id}/invitation`));
 

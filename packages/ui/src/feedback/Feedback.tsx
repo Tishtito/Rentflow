@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@rentflow/core';
+import { cn, type MessagePlan } from '@rentflow/core';
 import { PageHeader } from '../layout/PageHeader';
 
 type NoticeTone = 'info' | 'success' | 'warn' | 'danger';
@@ -12,12 +12,70 @@ const noticeTones: Record<NoticeTone, string> = {
 };
 
 /** Inline message box: form errors, "saved", "WhatsApp not connected"… */
-export function Notice({ tone = 'info', title, children, className }: { tone?: NoticeTone; title?: ReactNode; children?: ReactNode; className?: string }) {
+export function Notice({
+  tone = 'info',
+  title,
+  children,
+  className,
+}: {
+  tone?: NoticeTone;
+  title?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div role={tone === 'danger' ? 'alert' : 'status'} className={cn('flex flex-col gap-1 rounded-md px-4 py-3 text-sm', noticeTones[tone], className)}>
+    <div
+      role={tone === 'danger' ? 'alert' : 'status'}
+      className={cn('flex flex-col gap-1 rounded-md px-4 py-3 text-sm', noticeTones[tone], className)}
+    >
       {title && <strong className="font-semibold">{title}</strong>}
       {children}
     </div>
+  );
+}
+
+const channelNames: Record<MessagePlan['channel'], string> = { email: 'Email', whatsapp: 'WhatsApp', sms: 'SMS' };
+
+/**
+ * Alert after a send action (invitation, bill, receipt, resend): one line per channel, from the 202
+ * response's `messages`. Messages are queued, so this says where they're going, not that they arrived.
+ * Green when every channel is going out, amber when one was skipped (with the reason).
+ */
+export function MessagesNotice({
+  title,
+  messages,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  messages: MessagePlan[];
+  children?: ReactNode;
+  className?: string;
+}) {
+  const skipped = messages.some((m) => !m.sending);
+  return (
+    <Notice tone={skipped ? 'warn' : 'success'} title={title} className={className}>
+      {messages.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+          {messages.map((m) => (
+            <li key={m.channel}>
+              {m.sending ? (
+                <>
+                  <span aria-hidden="true">✓ </span>
+                  {m.count != null ? `${m.count} by ${channelNames[m.channel]}` : `${channelNames[m.channel]} to ${m.to}`}
+                </>
+              ) : (
+                <>
+                  <span aria-hidden="true">✗ </span>
+                  {channelNames[m.channel]} not sent: {m.note}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {children}
+    </Notice>
   );
 }
 

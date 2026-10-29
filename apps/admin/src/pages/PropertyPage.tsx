@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAccount, useCan, useChargeRates, useMoveIn, useProperty, useUnits } from '@rentflow/api';
-import { cn, effectiveBillingDay, formatAmount, formatDate, ordinal, toCents, type Unit } from '@rentflow/core';
+import { cn, effectiveBillingDay, formatAmount, formatDate, ordinal, toCents, type MessagePlan, type Unit } from '@rentflow/core';
 import {
   Badge,
   Button,
@@ -13,6 +13,7 @@ import {
   FilterChips,
   LoadingState,
   MoveInPanel,
+  MessagesNotice,
   Notice,
   PageHeader,
   PencilIcon,
@@ -42,7 +43,7 @@ export function PropertyPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [panel, setPanel] = useState<Panel>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ title: string; messages: MessagePlan[] } | null>(null);
 
   const list = units.data ?? [];
   const owes = (u: Unit) => toCents(u.current_lease?.balance) > 0;
@@ -78,7 +79,14 @@ export function PropertyPage() {
         }
         subtitle={
           <>
-            {[[p.town, p.county].filter(Boolean).join(', '), p.address, p.caretaker && `Looked after by ${p.caretaker.name}`, `${p.units_count ?? list.length} units`].filter(Boolean).join(' · ')}
+            {[
+              [p.town, p.county].filter(Boolean).join(', '),
+              p.address,
+              p.caretaker && `Looked after by ${p.caretaker.name}`,
+              `${p.units_count ?? list.length} units`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             {p.notes && <span className="mt-1 block whitespace-pre-line text-[13px] text-subtle">{p.notes}</span>}
           </>
         }
@@ -96,7 +104,7 @@ export function PropertyPage() {
         }
       />
 
-      {notice && <Notice tone="success">{notice}</Notice>}
+      {notice && <MessagesNotice title={notice.title} messages={notice.messages} />}
 
       <div className="flex flex-wrap items-start gap-6">
         <section aria-label="Units" className="flex min-w-0 flex-[3_1_560px] flex-col gap-3.5">
@@ -138,7 +146,11 @@ export function PropertyPage() {
                     header: 'Unit',
                     cell: (u) =>
                       canEdit ? (
-                        <button type="button" className="min-h-touch border-0 bg-transparent p-0 font-semibold text-brand" onClick={() => setPanel({ kind: 'unit', unitId: u.id })}>
+                        <button
+                          type="button"
+                          className="min-h-touch border-0 bg-transparent p-0 font-semibold text-brand"
+                          onClick={() => setPanel({ kind: 'unit', unitId: u.id })}
+                        >
                           {u.unit_number}
                         </button>
                       ) : (
@@ -193,14 +205,24 @@ export function PropertyPage() {
                   },
                   { key: 'status', header: 'Status', cell: (u) => <UnitStatusBadge status={u.status} /> },
                   actionsColumn<Unit>((u) => [
-                    { label: `Edit unit ${u.unit_number}`, icon: PencilIcon, onClick: () => setPanel({ kind: 'unit', unitId: u.id }), hidden: !canEdit },
+                    {
+                      label: `Edit unit ${u.unit_number}`,
+                      icon: PencilIcon,
+                      onClick: () => setPanel({ kind: 'unit', unitId: u.id }),
+                      hidden: !canEdit,
+                    },
                     {
                       label: `Move a tenant into ${u.unit_number}`,
                       icon: DoorInIcon,
                       onClick: () => setPanel({ kind: 'move-in', unitId: u.id }),
                       hidden: !canMoveIn || !(u.status === 'vacant' || u.status === 'reserved'),
                     },
-                    { label: `View ${u.current_lease?.tenant_name ?? 'tenant'}`, icon: EyeIcon, to: `/admin/tenants/${u.current_lease?.tenant_id}`, hidden: !u.current_lease },
+                    {
+                      label: `View ${u.current_lease?.tenant_name ?? 'tenant'}`,
+                      icon: EyeIcon,
+                      to: `/admin/tenants/${u.current_lease?.tenant_id}`,
+                      hidden: !u.current_lease,
+                    },
                   ]),
                 ]}
               />
@@ -225,9 +247,9 @@ export function PropertyPage() {
               // A utility billed a fixed amount needs no opening reading.
               .filter((m) => panelUnit.utilities?.find((u) => u.charge_code === m.charge_code)?.billing_type !== 'fixed')
               .map((m) => {
-              const info = chargeInfo(rates.data, m.charge_code);
-              return { id: m.id, label: info.label, unit_of_measure: info.unit || 'units' };
-            })}
+                const info = chargeInfo(rates.data, m.charge_code);
+                return { id: m.id, label: info.label, unit_of_measure: info.unit || 'units' };
+              })}
             submitting={moveIn.isPending}
             errors={fieldErrors(moveIn.error)}
             message={(() => {
@@ -242,7 +264,11 @@ export function PropertyPage() {
               moveIn.mutate(
                 {
                   unitId: input.unit_id,
-                  tenant: { ...input.tenant, email: input.tenant.email.trim() || null, national_id: input.tenant.national_id.trim() || null },
+                  tenant: {
+                    ...input.tenant,
+                    email: input.tenant.email.trim() || null,
+                    national_id: input.tenant.national_id.trim() || null,
+                  },
                   lease: {
                     ...input.lease,
                     // Only existing tenants have a chosen first bill date.
@@ -251,12 +277,9 @@ export function PropertyPage() {
                   opening_readings: input.opening_readings,
                 },
                 {
-                  onSuccess: () => {
-                    setNotice(
-                      input.tenant.email.trim()
-                        ? `${input.tenant.first_name} ${input.lease.existing ? 'added to' : 'moved into'} ${panelUnit.unit_number}. Portal invitation emailed to ${input.tenant.email.trim()}.`
-                        : `${input.tenant.first_name} ${input.lease.existing ? 'added to' : 'moved into'} ${panelUnit.unit_number}.`,
-                    );
+                  onSuccess: (sent) => {
+                    const moved = `${input.tenant.first_name} ${input.lease.existing ? 'added to' : 'moved into'} ${panelUnit.unit_number}.`;
+                    setNotice({ title: sent.messages.length > 0 ? `${moved} Portal invitation sent:` : moved, messages: sent.messages });
                     setPanel(null);
                   },
                 },

@@ -19,6 +19,7 @@ import {
   HomeIcon,
   FilterChips,
   LoadingState,
+  MessagesNotice,
   Notice,
   PageHeader,
   Pager,
@@ -137,7 +138,14 @@ function Messages() {
             { value: 'sms', label: 'SMS' },
           ]}
         />
-        <Button className="ml-auto" disabled={retryAll.isPending} onClick={() => retryAll.mutate(accountId ?? null)}>
+        <Button
+          className="ml-auto"
+          disabled={retryAll.isPending}
+          onClick={() => {
+            retry.reset();
+            retryAll.mutate(accountId ?? null);
+          }}
+        >
           {retryAll.isPending ? 'Resending…' : accountId ? 'Resend failed (this account)' : 'Resend all failed'}
         </Button>
       </div>
@@ -146,11 +154,15 @@ function Messages() {
           One account only · <Link to="/platform/messaging">show all accounts</Link>
         </p>
       )}
-      {retryAll.isSuccess && (
-        <Notice className="mx-4 mt-2" tone="success">
-          Failed messages are being resent.
-        </Notice>
-      )}
+      {retryAll.data &&
+        (retryAll.data.messages.length > 0 ? (
+          <MessagesNotice className="mx-4 mt-2" title="Failed messages are being resent" messages={retryAll.data.messages} />
+        ) : (
+          <Notice className="mx-4 mt-2" tone="info">
+            No failed messages to resend.
+          </Notice>
+        ))}
+      {retry.data && <MessagesNotice className="mx-4 mt-2" title="Resending the message" messages={retry.data.messages} />}
       {error && (
         <Notice className="mx-4 mt-2" tone="danger">
           {error instanceof ApiError ? error.message : "Can't reach the server."}
@@ -202,7 +214,10 @@ function Messages() {
                 {
                   label: `Resend to ${d.recipient}`,
                   icon: RefreshIcon,
-                  onClick: () => retry.mutate(d.id),
+                  onClick: () => {
+                    retryAll.reset();
+                    retry.mutate(d.id);
+                  },
                   hidden: d.status !== 'failed',
                   disabled: retry.isPending && retry.variables === d.id,
                 },

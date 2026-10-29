@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { ApiError, useResendInvoice, useVoidInvoice } from '@rentflow/api';
-import { formatKES, formatPeriod, type Channel, type Invoice } from '@rentflow/core';
+import { formatKES, formatPeriod, type Channel, type Invoice, type SentResponse } from '@rentflow/core';
 import { Button, ChannelPicker, Notice, SidePanel, TextAreaField } from '@rentflow/ui';
 import { fieldErrors, formMessage } from '../errors';
 
 type Bill = Pick<Invoice, 'id' | 'invoice_number' | 'period_start' | 'period_end' | 'total_due'> & { tenant?: Invoice['tenant'] };
 
 /** Send a bill again by email and/or WhatsApp, to the tenant's current contact details. */
-export function ResendBillPanel({ bill, onClose, onSent }: { bill: Bill; onClose: () => void; onSent?: () => void }) {
+export function ResendBillPanel({ bill, onClose, onSent }: { bill: Bill; onClose: () => void; onSent?: (sent: SentResponse) => void }) {
   const resend = useResendInvoice();
   const [channels, setChannels] = useState<Channel[]>(bill.tenant?.email ? ['email'] : ['whatsapp']);
   const message = formMessage(resend.error);
@@ -18,7 +18,10 @@ export function ResendBillPanel({ bill, onClose, onSent }: { bill: Bill; onClose
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          resend.mutate({ id: bill.id, channels: channels as Array<'email' | 'whatsapp'> }, { onSuccess: () => (onSent ?? onClose)() });
+          resend.mutate(
+            { id: bill.id, channels: channels as Array<'email' | 'whatsapp'> },
+            { onSuccess: (sent) => (onSent ? onSent(sent) : onClose()) },
+          );
         }}
       >
         {message && <Notice tone="danger">{message}</Notice>}
@@ -44,10 +47,17 @@ export function VoidBillPanel({ bill, onClose }: { bill: Bill; onClose: () => vo
   const [reason, setReason] = useState('');
   const [confirm, setConfirm] = useState(false);
   const errors = fieldErrors(voidBill.error);
-  const message = voidBill.error instanceof ApiError ? (errors.invoice ?? formMessage(voidBill.error, ['reason', 'invoice'])) : formMessage(voidBill.error);
+  const message =
+    voidBill.error instanceof ApiError
+      ? (errors.invoice ?? formMessage(voidBill.error, ['reason', 'invoice']))
+      : formMessage(voidBill.error);
 
   return (
-    <SidePanel title={`Void ${bill.invoice_number}`} subtitle={`${formatPeriod(bill.period_start, bill.period_end)} · ${formatKES(bill.total_due)}`} onClose={onClose}>
+    <SidePanel
+      title={`Void ${bill.invoice_number}`}
+      subtitle={`${formatPeriod(bill.period_start, bill.period_end)} · ${formatKES(bill.total_due)}`}
+      onClose={onClose}
+    >
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -58,10 +68,18 @@ export function VoidBillPanel({ bill, onClose }: { bill: Bill; onClose: () => vo
       >
         {message && <Notice tone="danger">{message}</Notice>}
         <Notice tone="warn">
-          The bill stays on record as <strong>void</strong> and stops counting towards what the tenant owes. The next billing run (or &quot;Run billing&quot; in Billing settings) makes a new bill
-          for the same period, with today&apos;s readings and prices. Fix the reading or price first.
+          The bill stays on record as <strong>void</strong> and stops counting towards what the tenant owes. The next billing run (or
+          &quot;Run billing&quot; in Billing settings) makes a new bill for the same period, with today&apos;s readings and prices. Fix the
+          reading or price first.
         </Notice>
-        <TextAreaField label="Reason" required hint="Kept on the bill and in the activity log" value={reason} onChange={(e) => (setReason(e.target.value), setConfirm(false))} error={errors.reason} />
+        <TextAreaField
+          label="Reason"
+          required
+          hint="Kept on the bill and in the activity log"
+          value={reason}
+          onChange={(e) => (setReason(e.target.value), setConfirm(false))}
+          error={errors.reason}
+        />
         <Button type="submit" variant="danger-outline" size="lg" disabled={voidBill.isPending || reason.trim() === ''}>
           {voidBill.isPending ? 'Voiding…' : confirm ? 'Click again to void' : 'Void bill'}
         </Button>
