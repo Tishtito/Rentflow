@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Invoice, InvitationPreview, Paginated, PortalHome, PortalLoginResult, PortalTenant, TenantPayment, Wrapped } from '@rentflow/core';
+import type { ChangePasswordInput, Invoice, InvitationPreview, Paginated, PasswordResetPreview, PortalHome, PortalLoginResult, PortalTenant, TenantPayment, Wrapped } from '@rentflow/core';
 import { ApiError, query, type ApiClient } from './client';
 import { useApi } from './context';
 
@@ -130,6 +130,59 @@ export function useAcceptInvitation(token: string) {
       return r.tenant;
     },
     onSuccess: (tenant) => qc.setQueryData(portalKeys.tenant, tenant),
+  });
+}
+
+/* ---------- Forgot password (one emailed link per landlord) ---------- */
+
+/** POST /api/portal/auth/forgot-password with an email or national ID; the answer is the same either way. */
+export function useTenantForgotPassword() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (identifier: string) => api.post<{ message: string }>('/api/portal/auth/forgot-password', { identifier }),
+  });
+}
+
+/** Who a reset link is for; `null` when the link is invalid, used or expired (404). */
+export function usePasswordResetLink(token: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['portal', 'password-reset', token],
+    queryFn: async () => {
+      try {
+        return await api.get<PasswordResetPreview>(`/api/portal/password-reset/${encodeURIComponent(token)}`);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    retry: false,
+    enabled: token.length > 0,
+  });
+}
+
+/** Choose a new password from the link; logs the tenant in (session on the web, token in the apps). */
+export function useResetTenantPassword(token: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { password: string; password_confirmation: string }) => {
+      const url = `/api/portal/password-reset/${encodeURIComponent(token)}`;
+      if (api.auth === 'cookie') return (await api.post<{ tenant: PortalTenant }>(url, body)).tenant;
+
+      const r = await api.post<{ tenant: PortalTenant; token: string }>(url, { ...body, device_name: 'Rentflow app' });
+      await api.setToken(r.token);
+      return r.tenant;
+    },
+    onSuccess: (tenant) => qc.setQueryData(portalKeys.tenant, tenant),
+  });
+}
+
+/** The logged-in tenant changes their own password (this device stays logged in). */
+export function useChangeTenantPassword() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (body: ChangePasswordInput) => api.put<{ message: string }>('/api/portal/auth/password', body),
   });
 }
 

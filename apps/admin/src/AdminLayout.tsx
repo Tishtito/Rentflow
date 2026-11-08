@@ -45,6 +45,7 @@ export function AdminLayout({ variant }: { variant: 'landlord' | 'super' }) {
             nav={variant === 'super' ? superAdminNav : allowedNav(session.data)}
             bottomNav={variant === 'landlord' ? <BottomNav tabs={landlordTabs} allowed={allowedNav(session.data)} /> : undefined}
             user={{ name: session.data.name, roleLabel: roleLabel(session.data), initials: initials(session.data.name) }}
+            userTo={variant === 'super' ? '/platform/account' : '/admin/account'}
             onLogout={() =>
               logout.mutate(undefined, {
                 onSettled: () => {
