@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { downloadInvoicePdf, useApi, useCan, useEndLease, useResendInvitation, useTenantDetail, useUpdateTenant } from '@rentflow/api';
+import {
+  downloadInvoicePdf,
+  useApi,
+  useCan,
+  useChangeRent,
+  useEndLease,
+  useRentChanges,
+  useResendInvitation,
+  useSendTenantPasswordReset,
+  useSetTenantPassword,
+  useTenantDetail,
+  useUpdateTenant,
+} from '@rentflow/api';
 import { cn, formatAmount, formatDate, formatKES, formatPeriod, toCents, type AdminTenant, type Invoice } from '@rentflow/core';
 import {
   Badge,
   Button,
   ButtonLink,
   Card,
+  CheckboxField,
   DataTable,
   ErrorState,
   EyeIcon,
@@ -23,8 +36,11 @@ import {
   actionsColumn,
 } from '@rentflow/ui';
 import { fieldErrors, formMessage } from '../errors';
+import { BillNowPanel } from '../panels/BillPanels';
 
-/** One tenant: contact, home and balance, bills and payments; edit, resend invitation, move out. */
+type Panel = 'edit' | 'end' | 'password' | 'rent' | 'bill' | null;
+
+/** One tenant: contact, home and balance, bills and payments; edit, resend invitation, password, change rent, move out. */
 export function TenantPage() {
   const id = Number(useParams().tenantId);
   const tenant = useTenantDetail(id);
@@ -32,11 +48,12 @@ export function TenantPage() {
   const api = useApi();
   const canEdit = can('tenants.manage');
   const canEndLease = can('leases.manage');
+  const canBill = can('billing.run');
   const invite = useResendInvitation();
   // ?edit=1 (the pencil in the tenants list) opens the edit panel straight away.
   const [params, setParams] = useSearchParams();
-  const [panel, setPanelState] = useState<'edit' | 'end' | null>(params.get('edit') === '1' && canEdit ? 'edit' : null);
-  const setPanel = (next: 'edit' | 'end' | null) => {
+  const [panel, setPanelState] = useState<Panel>(params.get('edit') === '1' && canEdit ? 'edit' : null);
+  const setPanel = (next: Panel) => {
     setPanelState(next);
     if (!next && params.has('edit')) setParams({}, { replace: true });
   };
@@ -71,6 +88,7 @@ export function TenantPage() {
                 </Button>
               )}
               <Button onClick={() => setPanel('edit')}>Edit details</Button>
+              {t.status === 'active' && <Button onClick={() => setPanel('password')}>Password</Button>}
               {lease && (
                 <ButtonLink variant="primary" to={`/admin/payments?lease=${lease.id}`}>
                   Record payment
@@ -119,6 +137,11 @@ export function TenantPage() {
 
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
           {panel === 'edit' && <EditTenantPanel tenant={t} onClose={() => setPanel(null)} />}
+          {panel === 'password' && <PasswordPanel tenant={t} onClose={() => setPanel(null)} />}
+          {panel === 'bill' && lease && <BillNowPanel lease={{ ...lease, tenant_name: t.full_name }} onClose={() => setPanel(null)} />}
+          {panel === 'rent' && lease && (
+            <ChangeRentPanel leaseId={lease.id} unit={lease.unit_number ?? ''} rent={lease.monthly_rent} onClose={() => setPanel(null)} />
+          )}
           {panel === 'end' && lease && (
             <EndLeasePanel leaseId={lease.id} unit={lease.unit_number ?? ''} startDate={lease.start_date} onClose={() => setPanel(null)} />
           )}
@@ -140,17 +163,33 @@ export function TenantPage() {
                 <dt className="text-muted">Moved in</dt>
                 <dd className="m-0">{formatDate(lease.start_date, { year: true })}</dd>
                 <dt className="text-muted">Next bill</dt>
-                <dd className="m-0">{formatDate(lease.next_billing_date, { year: true })}</dd>
+                <dd className="m-0">
+                  {formatDate(lease.next_billing_date, { year: true })}
+                  {lease.bill_due && (
+                    <Badge tone="warn" className="ml-2">
+                      Due, not made yet
+                    </Badge>
+                  )}
+                </dd>
                 <dt className="text-muted">Lease</dt>
                 <dd className="m-0">
                   <LeaseStatusBadge status={lease.status} />
                 </dd>
               </dl>
             )}
-            {canEndLease && lease && (
-              <Button variant="danger-outline" className="self-start" onClick={() => setPanel('end')}>
-                Move out…
+            {lease && <RentHistory leaseId={lease.id} />}
+            {lease?.bill_due && canBill && (
+              <Button variant="primary" className="self-start" onClick={() => setPanel('bill')}>
+                Bill now…
               </Button>
+            )}
+            {canEndLease && lease && (
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setPanel('rent')}>Change rent…</Button>
+                <Button variant="danger-outline" onClick={() => setPanel('end')}>
+                  Move out…
+                </Button>
+              </div>
             )}
           </Card>
 
@@ -257,6 +296,78 @@ function EditTenantPanel({ tenant, onClose }: { tenant: AdminTenant; onClose: ()
   );
 }
 
+/** New monthly rent from the next bill; bills already sent keep theirs (re-bill one to correct it). */
+function ChangeRentPanel({ leaseId, unit, rent, onClose }: { leaseId: number; unit: string; rent: string; onClose: () => void }) {
+  const change = useChangeRent();
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const errors = fieldErrors(change.error);
+  const message = formMessage(change.error, ['monthly_rent', 'reason']);
+
+  return (
+    <SidePanel title={`Change rent for ${unit}`} subtitle={`Now ${formatKES(rent)} a month`} onClose={onClose} className="flex-none">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          change.mutate({ leaseId, monthly_rent: amount, reason }, { onSuccess: onClose });
+        }}
+      >
+        {message && <Notice tone="danger">{message}</Notice>}
+        <TextField
+          label="New rent a month (KES)"
+          inputMode="decimal"
+          numeric
+          required
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          error={errors.monthly_rent ?? errors.lease}
+        />
+        <TextField
+          label="Reason (optional)"
+          value={reason}
+          maxLength={500}
+          onChange={(e) => setReason(e.target.value)}
+          error={errors.reason}
+        />
+        <span className="text-xs text-muted">
+          Applies from the next bill. Bills already sent keep the old rent. To correct one, open the bill and choose Re-bill.
+        </span>
+        <Button type="submit" variant="primary" size="lg" disabled={change.isPending || amount.trim() === ''}>
+          {change.isPending ? 'Saving…' : 'Change rent'}
+        </Button>
+      </form>
+    </SidePanel>
+  );
+}
+
+/** Past rent changes on the lease, newest first (hidden when there are none). */
+function RentHistory({ leaseId }: { leaseId: number }) {
+  const changes = useRentChanges(leaseId);
+  const rows = changes.data ?? [];
+  if (rows.length === 0) return null;
+
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-muted">Rent history ({rows.length})</summary>
+      <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+        {rows.map((c) => (
+          <li key={c.id} className="flex flex-col">
+            <span className="num">
+              {formatKES(c.old_rent)} → {formatKES(c.new_rent)}
+            </span>
+            <span className="text-xs text-muted">
+              {formatDate(c.created_at, { year: true })}
+              {c.changed_by ? ` · ${c.changed_by}` : ''}
+              {c.reason ? ` · ${c.reason}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function EndLeasePanel({ leaseId, unit, startDate, onClose }: { leaseId: number; unit: string; startDate: string; onClose: () => void }) {
   const end = useEndLease();
   const [date, setDate] = useState('');
@@ -289,6 +400,85 @@ function EndLeasePanel({ leaseId, unit, startDate, onClose }: { leaseId: number;
           {end.isPending ? 'Saving…' : 'End lease'}
         </Button>
       </form>
+    </SidePanel>
+  );
+}
+
+/**
+ * A tenant's portal password: type a new one (works at once; tell the tenant) or email them a reset link
+ * so they choose their own. Only for tenants who have set up their login.
+ */
+function PasswordPanel({ tenant, onClose }: { tenant: AdminTenant; onClose: () => void }) {
+  const setPassword = useSetTenantPassword();
+  const sendLink = useSendTenantPasswordReset();
+  const [password, setValue] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [mismatch, setMismatch] = useState('');
+  const errors = fieldErrors(setPassword.error);
+  const message = formMessage(setPassword.error, ['password']);
+  const linkError = formMessage(sendLink.error);
+
+  return (
+    <SidePanel title="Password" subtitle={tenant.full_name} onClose={onClose} className="flex-none">
+      {setPassword.isSuccess ? (
+        <Notice tone="success">
+          Password changed. Let {tenant.first_name} know their new password; they log in with {tenant.email ?? `ID ${tenant.national_id}`}.
+          Their app was logged out.
+        </Notice>
+      ) : (
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (password !== confirm) return setMismatch("Passwords don't match");
+            setPassword.mutate({ tenantId: tenant.id, password, password_confirmation: confirm });
+          }}
+        >
+          <span className="text-sm text-muted">Type a new password and tell the tenant what it is. It works straight away.</span>
+          {message && <Notice tone="danger">{message}</Notice>}
+          <TextField
+            label="New password"
+            type={show ? 'text' : 'password'}
+            autoComplete="new-password"
+            required
+            minLength={8}
+            hint="At least 8 characters"
+            value={password}
+            onChange={(e) => setValue(e.target.value)}
+            error={errors.password}
+          />
+          <TextField
+            label="Confirm password"
+            type={show ? 'text' : 'password'}
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              setMismatch('');
+            }}
+            error={mismatch}
+          />
+          <CheckboxField label="Show password" checked={show} onChange={setShow} />
+          <Button type="submit" variant="primary" size="lg" disabled={setPassword.isPending}>
+            {setPassword.isPending ? 'Saving…' : 'Set password'}
+          </Button>
+        </form>
+      )}
+
+      <div className="flex flex-col gap-3 border-0 border-t border-solid border-line pt-4">
+        <span className="text-sm text-muted">Or email {tenant.first_name} a link to choose their own password (works for 24 hours).</span>
+        {sendLink.data ? (
+          <MessagesNotice title="Reset link sent" messages={sendLink.data.messages} />
+        ) : (
+          <Button onClick={() => sendLink.mutate(tenant.id)} disabled={sendLink.isPending || !tenant.email}>
+            {sendLink.isPending ? 'Sending…' : 'Email a reset link'}
+          </Button>
+        )}
+        {!tenant.email && <span className="text-xs text-muted">Add the tenant&apos;s email first (Edit details).</span>}
+        {linkError && <Notice tone="danger">{linkError}</Notice>}
+      </div>
     </SidePanel>
   );
 }

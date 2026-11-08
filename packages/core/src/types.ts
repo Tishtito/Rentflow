@@ -83,6 +83,8 @@ export interface UnitLease {
   start_date: ISODate;
   monthly_rent: Money;
   next_billing_date: ISODate;
+  /** A monthly bill is due and not made yet (skipped by the billing run): "Bill now" makes it. */
+  bill_due?: boolean;
   status: LeaseStatus;
   /** Running balance: positive = owes, negative = credit. */
   balance: Money | null;
@@ -209,6 +211,11 @@ export interface Invoice {
   void_reason?: string | null;
   /** Name of who voided it. */
   voided_by?: string | null;
+  /** The void bill this one was re-made from (re-bill). */
+  replaces_invoice_id?: number | null;
+  replaces_invoice_number?: string | null;
+  /** The bill that replaced this void one (re-bill); only on the bill page. */
+  replaced_by?: { id: number; invoice_number: string } | null;
 }
 
 /** meta.summary of GET /api/admin/invoices: totals for the filtered bills (void bills add no money). */
@@ -280,6 +287,8 @@ export interface MeterReadingTask {
     previous_date: ISODate | null;
     current_reading: Money | null; // null = still to capture
     current_date?: ISODate | null;
+    /** Last usage before a fixed amount: billed if read, left off the bill if not. */
+    optional?: boolean;
   }>;
 }
 
@@ -339,6 +348,21 @@ export interface MessagePlan {
 export interface SentResponse {
   message: string;
   messages: MessagePlan[];
+}
+
+/** 202 body of POST invoices/{id}/rebill and leases/{id}/bill: the new bill and where it's sent. */
+export interface RebillResponse extends SentResponse {
+  invoice_id: number;
+}
+
+/** One rent change on a lease (GET leases/{id}/rent-changes). */
+export interface LeaseRentChange {
+  id: number;
+  old_rent: string;
+  new_rent: string;
+  reason: string | null;
+  changed_by: string | null;
+  created_at: string;
 }
 
 export interface NotificationDelivery {
@@ -703,6 +727,8 @@ export interface TenantLease {
   monthly_rent: Money;
   deposit_amount: Money;
   next_billing_date: ISODate;
+  /** A monthly bill is due and not made yet (skipped by the billing run): "Bill now" makes it. */
+  bill_due?: boolean;
   status: LeaseStatus;
   balance: Money | null;
 }
@@ -735,6 +761,16 @@ export interface InvitationPreview {
   home: string | null;
   log_in_with: string[];
   expires_at: ISODateTime;
+}
+
+/** GET /api/portal/password-reset/{token}: who a password reset link is for (same shape as an invitation). */
+export type PasswordResetPreview = InvitationPreview;
+
+/** PUT /api/admin/auth/password, PUT /api/portal/auth/password */
+export interface ChangePasswordInput {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
 }
 
 /** GET /api/admin/dashboard */

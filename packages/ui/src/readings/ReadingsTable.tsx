@@ -98,6 +98,7 @@ export function ReadingsTable({
                       <td className={td}>
                         {m.label}
                         {m.meter_number && <span className="block text-xs text-muted">{m.meter_number}</span>}
+                        {m.optional && <span className="block text-xs text-muted">Optional: last reading before the fixed amount</span>}
                       </td>
                       <td className={cn(td, 'num whitespace-nowrap text-right')}>
                         {formatQuantity(m.previous_reading)}
@@ -219,6 +220,8 @@ export function ReadingsTable({
                       <span className="flex items-center gap-1">
                         {m.current_reading !== null ? (
                           <Badge tone="success">{formatQuantity(m.current_reading)}</Badge>
+                        ) : m.optional ? (
+                          <Badge tone="neutral">Optional</Badge>
                         ) : (
                           <Badge tone="warn">To do</Badge>
                         )}

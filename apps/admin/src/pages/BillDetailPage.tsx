@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { downloadInvoicePdf, useApi, useCan, useInvoice, usePayments } from '@rentflow/api';
 import { formatDateTime, formatKES, toCents, type MessagePlan } from '@rentflow/core';
 import {
@@ -17,7 +17,7 @@ import {
   PageHeader,
   PaymentHistoryList,
 } from '@rentflow/ui';
-import { ResendBillPanel, VoidBillPanel } from '../panels/BillPanels';
+import { RebillPanel, ResendBillPanel, VoidBillPanel } from '../panels/BillPanels';
 
 /** One bill (GET /api/admin/invoices/{id}) with the payments on its lease. */
 export function BillDetailPage() {
@@ -27,7 +27,8 @@ export function BillDetailPage() {
   const payments = usePayments({ lease_id: leaseId }, { enabled: leaseId !== undefined });
   const api = useApi();
   const can = useCan();
-  const [panel, setPanel] = useState<'resend' | 'void' | null>(null);
+  const navigate = useNavigate();
+  const [panel, setPanel] = useState<'resend' | 'void' | 'rebill' | null>(null);
   const [notice, setNotice] = useState<{ title: string; messages: MessagePlan[] } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -62,6 +63,14 @@ export function BillDetailPage() {
           <span className="flex flex-wrap items-center gap-2">
             <InvoiceStatusBadge status={bill.status} />
             {bill.type === 'move_in' && <Badge tone="info">Move-in bill</Badge>}
+            {bill.replaces_invoice_id && (
+              <Badge tone="neutral">
+                Replaces{' '}
+                <Link to={`/admin/bills/${bill.replaces_invoice_id}`}>
+                  {bill.replaces_invoice_number ?? `#${bill.replaces_invoice_id}`}
+                </Link>
+              </Badge>
+            )}
           </span>
         }
         actions={
@@ -70,6 +79,7 @@ export function BillDetailPage() {
               {downloading ? 'Downloading…' : 'Download PDF'}
             </Button>
             {!isVoid && can('invoices.manage') && <Button onClick={() => setPanel('resend')}>Resend…</Button>}
+            {!isVoid && can('invoices.manage') && <Button onClick={() => setPanel('rebill')}>Re-bill…</Button>}
             {!isVoid && can('invoices.manage') && (
               <Button variant="danger-outline" onClick={() => setPanel('void')}>
                 Void…
@@ -85,7 +95,15 @@ export function BillDetailPage() {
       />
       {notice && <MessagesNotice title={notice.title} messages={notice.messages} />}
       {downloadError && <Notice tone="danger">{downloadError}</Notice>}
-      {isVoid && (
+      {isVoid && bill.replaced_by && (
+        <Notice tone="warn" title="This bill was re-billed">
+          Voided{bill.voided_by ? ` by ${bill.voided_by}` : ''}
+          {bill.voided_at ? ` on ${formatDateTime(bill.voided_at)}` : ''}
+          {bill.void_reason ? `: “${bill.void_reason}”` : ''}. It was replaced by{' '}
+          <Link to={`/admin/bills/${bill.replaced_by.id}`}>{bill.replaced_by.invoice_number}</Link>.
+        </Notice>
+      )}
+      {isVoid && !bill.replaced_by && (
         <Notice tone="warn" title="This bill is void">
           Voided{bill.voided_by ? ` by ${bill.voided_by}` : ''}
           {bill.voided_at ? ` on ${formatDateTime(bill.voided_at)}` : ''}
@@ -114,6 +132,17 @@ export function BillDetailPage() {
             />
           )}
           {panel === 'void' && <VoidBillPanel bill={bill} onClose={() => setPanel(null)} />}
+          {panel === 'rebill' && (
+            <RebillPanel
+              bill={bill}
+              onClose={() => setPanel(null)}
+              onDone={(result) => {
+                setPanel(null);
+                setNotice({ title: 'New bill made. It is being sent to the tenant.', messages: result.messages });
+                navigate(`/admin/bills/${result.invoice_id}`);
+              }}
+            />
+          )}
           <Card title="Balance on this bill" id="balance">
             <span className={`num font-display text-[28px] font-bold ${owing ? 'text-warn-strong' : 'text-brand'}`}>
               {formatKES(bill.balance_remaining, { decimals: 2 })}
