@@ -17,17 +17,19 @@ import {
   Notice,
   PageHeader,
   PencilIcon,
+  ReceiptIcon,
   SearchInput,
   UnitStatusBadge,
   actionsColumn,
 } from '@rentflow/ui';
 import { chargeInfo } from '../charges';
 import { fieldErrors, formMessage } from '../errors';
+import { BillNowPanel } from '../panels/BillPanels';
 import { PropertyPanel } from '../panels/PropertyPanel';
 import { UnitPanel } from '../panels/UnitPanel';
 
 type Filter = 'all' | 'occupied' | 'vacant' | 'arrears';
-type Panel = { kind: 'move-in' | 'unit'; unitId: number } | { kind: 'add-unit' } | { kind: 'property' } | null;
+type Panel = { kind: 'move-in' | 'unit' | 'bill'; unitId: number } | { kind: 'add-unit' } | { kind: 'property' } | null;
 
 /** One property: its units with tenant, rent, next bill and balance; move-in, add/edit units and meters. */
 export function PropertyPage() {
@@ -39,6 +41,7 @@ export function PropertyPage() {
   const can = useCan();
   const canEdit = can('properties.manage');
   const canMoveIn = can('leases.manage');
+  const canBill = can('billing.run');
   const moveIn = useMoveIn();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -181,6 +184,11 @@ export function PropertyPage() {
                     cell: (u) => (
                       <>
                         {u.current_lease ? formatDate(u.current_lease.next_billing_date) : <span className="text-muted">—</span>}
+                        {u.current_lease?.bill_due && (
+                          <Badge tone="warn" className="ml-1.5">
+                            Not billed
+                          </Badge>
+                        )}
                         {u.billing_day != null && u.billing_day !== propertyDay && (
                           <span className="block text-xs text-muted">Bills on the {ordinal(u.billing_day)}</span>
                         )}
@@ -218,6 +226,12 @@ export function PropertyPage() {
                       hidden: !canMoveIn || !(u.status === 'vacant' || u.status === 'reserved'),
                     },
                     {
+                      label: `Bill ${u.unit_number} now`,
+                      icon: ReceiptIcon,
+                      onClick: () => setPanel({ kind: 'bill', unitId: u.id }),
+                      hidden: !canBill || !u.current_lease?.bill_due,
+                    },
+                    {
                       label: `View ${u.current_lease?.tenant_name ?? 'tenant'}`,
                       icon: EyeIcon,
                       to: `/admin/tenants/${u.current_lease?.tenant_id}`,
@@ -233,6 +247,13 @@ export function PropertyPage() {
           </span>
         </section>
 
+        {panel?.kind === 'bill' && panelUnit?.current_lease && (
+          <BillNowPanel
+            key={panelUnit.id}
+            lease={{ ...panelUnit.current_lease, unit_number: panelUnit.unit_number }}
+            onClose={() => setPanel(null)}
+          />
+        )}
         {panel?.kind === 'property' && <PropertyPanel property={p} onClose={() => setPanel(null)} />}
         {panel?.kind === 'add-unit' && <UnitPanel propertyId={id} inheritedBillingDay={propertyDay} onClose={() => setPanel(null)} />}
         {panel?.kind === 'unit' && panelUnit && (

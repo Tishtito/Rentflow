@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type {
   Account,
   AdminTenant,
+  ChangePasswordInput,
   AuthUser,
   BillingRun,
   ChargeRate,
@@ -9,6 +10,7 @@ import type {
   Invoice,
   InvoiceListStatus,
   InvoiceSummary,
+  LeaseRentChange,
   MeterReadingEntry,
   MeterReadingTask,
   MeterSetup,
@@ -23,6 +25,7 @@ import type {
   Unit,
   WhatsAppConnection,
   Wrapped,
+  RebillResponse,
   SentResponse,
 } from '@rentflow/core';
 import { ApiError, query, type ApiClient } from './client';
@@ -206,6 +209,12 @@ export const useResendInvoice = () =>
 /** Void a wrong bill (latest bill of its lease, nothing paid yet); the next billing run bills the period again. */
 export const useVoidInvoice = () =>
   useAdminWrite((api, { id, reason }: { id: number; reason: string }) => api.post(`/api/admin/invoices/${id}/void`, { reason }));
+
+/** Void a bill and make it again for that tenant only (current rent, prices, readings; same dates). */
+export const useRebillInvoice = () =>
+  useAdminWrite((api, { id, reason }: { id: number; reason: string }) =>
+    api.post<RebillResponse>(`/api/admin/invoices/${id}/rebill`, { reason }),
+  );
 
 /** Download a bill's PDF and save it (same file the tenant gets). */
 export async function downloadInvoicePdf(api: ApiClient, invoice: Pick<Invoice, 'id' | 'invoice_number'>): Promise<void> {
@@ -448,6 +457,25 @@ export const useEndLease = () =>
     api.post(`/api/admin/leases/${leaseId}/end`, { end_date }),
   );
 
+/** "Bill now": make one lease's due monthly bill straight away. */
+export const useBillLeaseNow = () =>
+  useAdminWrite((api, { leaseId }: { leaseId: number }) => api.post<RebillResponse>(`/api/admin/leases/${leaseId}/bill`, {}));
+
+/** New monthly rent on a running lease, from the next bill. */
+export const useChangeRent = () =>
+  useAdminWrite((api, { leaseId, monthly_rent, reason }: { leaseId: number; monthly_rent: string; reason?: string }) =>
+    api.put(`/api/admin/leases/${leaseId}/rent`, { monthly_rent, reason: reason || null }),
+  );
+
+export function useRentChanges(leaseId: number | undefined) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['admin', 'leases', leaseId, 'rent-changes'],
+    queryFn: () => api.get<{ data: LeaseRentChange[] }>(`/api/admin/leases/${leaseId}/rent-changes`).then((r) => r.data),
+    enabled: leaseId !== undefined,
+  });
+}
+
 export function useTenants(filters: { search?: string; page?: number } = {}) {
   const api = useApi();
   return useQuery({
@@ -482,6 +510,16 @@ export const useUpdateTenant = () =>
 
 export const useResendInvitation = () =>
   useAdminWrite((api, tenantId: number) => api.post<SentResponse>(`/api/admin/tenants/${tenantId}/invitation`));
+
+/** The landlord types a tenant's new portal password (works at once; their apps are logged out). */
+export const useSetTenantPassword = () =>
+  useAdminWrite((api, { tenantId, ...body }: { tenantId: number; password: string; password_confirmation: string }) =>
+    api.put<{ message: string }>(`/api/admin/tenants/${tenantId}/password`, body),
+  );
+
+/** Email the tenant a password reset link (24 h); `messages` says where it went. */
+export const useSendTenantPasswordReset = () =>
+  useAdminWrite((api, tenantId: number) => api.post<SentResponse>(`/api/admin/tenants/${tenantId}/password-reset`));
 
 /* ---------- Billing settings: charge rates + cycle ---------- */
 
@@ -659,6 +697,14 @@ export const useResendStaffInvite = () => useAdminWrite((api, id: number) => api
 export function useForgotPassword() {
   const api = useApi();
   return useMutation({ mutationFn: (email: string) => api.post<{ message: string }>('/api/admin/auth/forgot-password', { email }) });
+}
+
+/** The logged-in admin changes their own password (this device stays logged in). */
+export function useChangeAdminPassword() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (body: ChangePasswordInput) => api.put<{ message: string }>('/api/admin/auth/password', body),
+  });
 }
 
 /** Set the password from an invitation / reset link; logs in (session on the web, token in the apps). */

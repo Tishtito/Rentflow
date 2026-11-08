@@ -64,6 +64,7 @@ export function AdminShell({
   accountName,
   onSwitchAccount,
   user,
+  userTo,
   onLogout,
   bottomNav,
   children,
@@ -74,6 +75,7 @@ export function AdminShell({
   accountName?: string; // landlords; super admins acting inside an account
   onSwitchAccount?: () => void; // makes the account block a switcher button
   user?: { name: string; roleLabel: string; initials: string };
+  userTo?: string; // makes the name a link to "your account" (change password)
   onLogout?: () => void;
   bottomNav?: ReactNode;
   children?: ReactNode; // defaults to <Outlet/>
@@ -179,13 +181,30 @@ export function AdminShell({
 
         {user && (
           <div className="mt-auto flex items-center gap-2.5 border-t border-nav-line px-2 py-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-mint text-sm font-semibold text-nav">
-              {user.initials}
-            </span>
-            <span className="flex flex-1 flex-col text-[13px]">
-              {user.name}
-              <span className="text-xs text-nav-muted">{user.roleLabel}</span>
-            </span>
+            {(() => {
+              const who = (
+                <>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-mint text-sm font-semibold text-nav">
+                    {user.initials}
+                  </span>
+                  <span className="flex flex-1 flex-col text-[13px]">
+                    {user.name}
+                    <span className="text-xs text-nav-muted">{userTo ? 'Your account' : user.roleLabel}</span>
+                  </span>
+                </>
+              );
+              return userTo ? (
+                <NavLink
+                  to={userTo}
+                  title={`${user.roleLabel} · your account and password`}
+                  className="flex min-h-touch flex-1 items-center gap-2.5 rounded-md text-white no-underline hover:bg-nav-raised"
+                >
+                  {who}
+                </NavLink>
+              ) : (
+                who
+              );
+            })()}
             {onLogout && (
               <button
                 type="button"

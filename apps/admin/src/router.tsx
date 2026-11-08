@@ -13,6 +13,7 @@ import { TenantPage } from './pages/TenantPage';
 import { TenantsPage } from './pages/TenantsPage';
 import { BillingSettingsPage } from './pages/BillingSettingsPage';
 import { AuthPage } from './pages/AuthPage';
+import { AccountPage } from './pages/AccountPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { WhatsAppSettingsPage } from './pages/WhatsAppSettingsPage';
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
       { path: 'settings/whatsapp', element: <WhatsAppSettingsPage /> },
       { path: 'team', element: <TeamPage /> },
       { path: 'team/roles', element: <RolesPage /> },
+      { path: 'account', element: <AccountPage /> },
       { path: '*', element: <ComingSoon title="Not found" description="This page doesn't exist." /> },
     ],
   },
@@ -86,6 +88,7 @@ export const router = createBrowserRouter([
       { path: 'roles', element: <PlatformRolesPage /> },
       { path: 'admins', element: <PlatformAdminsPage /> },
       { path: 'activity', element: <PlatformActivityPage /> },
+      { path: 'account', element: <AccountPage /> },
       { path: '*', element: <ComingSoon title="Not found" description="This page doesn't exist." /> },
     ],
   },
