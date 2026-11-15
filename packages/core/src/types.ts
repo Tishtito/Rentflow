@@ -355,6 +355,30 @@ export interface RebillResponse extends SentResponse {
   invoice_id: number;
 }
 
+/** One charge of a tenant's house and whether they pay it (GET leases/{id}/charges). */
+export interface LeaseCharge {
+  charge_code: string;
+  label: string;
+  billing_type: 'metered' | 'fixed';
+  rate: Money;
+  unit_of_measure: string | null;
+  /** Excused on the next bill. */
+  excluded: boolean;
+  /** First bill the excuse applies to (in the future = from the next bill). */
+  excluded_from: ISODate | null;
+  reason: string | null;
+  /** The excused spell ends and the charge comes back on this bill. */
+  charged_again_from: ISODate | null;
+  history: Array<{
+    id: number;
+    starts_on: ISODate;
+    ends_on: ISODate | null;
+    reason: string | null;
+    created_by: string | null;
+    ended_by: string | null;
+  }>;
+}
+
 /** One rent change on a lease (GET leases/{id}/rent-changes). */
 export interface LeaseRentChange {
   id: number;

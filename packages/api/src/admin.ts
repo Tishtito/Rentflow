@@ -10,6 +10,7 @@ import type {
   Invoice,
   InvoiceListStatus,
   InvoiceSummary,
+  LeaseCharge,
   LeaseRentChange,
   MeterReadingEntry,
   MeterReadingTask,
@@ -465,6 +466,28 @@ export const useBillLeaseNow = () =>
 export const useChangeRent = () =>
   useAdminWrite((api, { leaseId, monthly_rent, reason }: { leaseId: number; monthly_rent: string; reason?: string }) =>
     api.put(`/api/admin/leases/${leaseId}/rent`, { monthly_rent, reason: reason || null }),
+  );
+
+/** Each charge of the tenant's house and whether they pay it. */
+export function useLeaseCharges(leaseId: number | undefined) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['admin', 'leases', leaseId, 'charges'],
+    queryFn: () => api.get<{ data: LeaseCharge[] }>(`/api/admin/leases/${leaseId}/charges`).then((r) => r.data),
+    enabled: leaseId !== undefined,
+  });
+}
+
+/** Excuse the tenant from a charge, from their next bill. */
+export const useExcludeCharge = () =>
+  useAdminWrite((api, { leaseId, charge_code, reason }: { leaseId: number; charge_code: string; reason?: string }) =>
+    api.post(`/api/admin/leases/${leaseId}/charge-exclusions`, { charge_code, reason: reason || null }),
+  );
+
+/** Charge the tenant again, from their next bill. */
+export const useIncludeCharge = () =>
+  useAdminWrite((api, { leaseId, charge_code }: { leaseId: number; charge_code: string }) =>
+    api.delete(`/api/admin/leases/${leaseId}/charge-exclusions/${encodeURIComponent(charge_code)}`),
   );
 
 export function useRentChanges(leaseId: number | undefined) {
