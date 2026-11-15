@@ -6,6 +6,9 @@ import {
   useCan,
   useChangeRent,
   useEndLease,
+  useExcludeCharge,
+  useIncludeCharge,
+  useLeaseCharges,
   useRentChanges,
   useResendInvitation,
   useSendTenantPasswordReset,
@@ -13,7 +16,17 @@ import {
   useTenantDetail,
   useUpdateTenant,
 } from '@rentflow/api';
-import { cn, formatAmount, formatDate, formatKES, formatPeriod, toCents, type AdminTenant, type Invoice } from '@rentflow/core';
+import {
+  cn,
+  formatAmount,
+  formatDate,
+  formatKES,
+  formatPeriod,
+  toCents,
+  type AdminTenant,
+  type Invoice,
+  type LeaseCharge,
+} from '@rentflow/core';
 import {
   Badge,
   Button,
@@ -193,6 +206,8 @@ export function TenantPage() {
             )}
           </Card>
 
+          {lease && <ChargesCard leaseId={lease.id} nextBill={lease.next_billing_date} canManage={can('rates.manage')} />}
+
           <Card title="Contact" id="contact">
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
               <dt className="text-muted">Phone</dt>
@@ -290,6 +305,121 @@ function EditTenantPanel({ tenant, onClose }: { tenant: AdminTenant; onClose: ()
         </div>
         <Button type="submit" variant="primary" size="lg" disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </form>
+    </SidePanel>
+  );
+}
+
+/**
+ * The house's charges (rent aside) and whether this tenant pays each one. Excuse a tenant from a charge, or charge
+ * them again, from their next bill.
+ */
+function ChargesCard({ leaseId, nextBill, canManage }: { leaseId: number; nextBill: string; canManage: boolean }) {
+  const charges = useLeaseCharges(leaseId);
+  const include = useIncludeCharge();
+  const [excusing, setExcusing] = useState<LeaseCharge | null>(null);
+  const includeError = formMessage(include.error, ['charge_code']) ?? fieldErrors(include.error).charge_code;
+  const rows = charges.data ?? [];
+
+  return (
+    <>
+      {excusing && <ExcuseChargePanel leaseId={leaseId} charge={excusing} nextBill={nextBill} onClose={() => setExcusing(null)} />}
+      <Card title="Charges" description="What this tenant pays besides rent" id="charges">
+        {charges.isError && <Notice tone="danger">{charges.error.message}</Notice>}
+        {includeError && <Notice tone="danger">{includeError}</Notice>}
+        {charges.isPending ? (
+          <span className="text-sm text-muted">Loading…</span>
+        ) : rows.length === 0 ? (
+          <span className="text-sm text-muted">This property has no charges besides rent.</span>
+        ) : (
+          <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
+            {rows.map((c) => (
+              <li key={c.charge_code} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                <span className="flex min-w-0 flex-col">
+                  <span className={cn('font-semibold', c.excluded && 'text-muted line-through')}>{c.label}</span>
+                  <span className="num text-xs text-muted">
+                    {c.billing_type === 'metered'
+                      ? `${formatKES(c.rate)} per ${c.unit_of_measure || 'unit'}`
+                      : `${formatKES(c.rate)} a month`}
+                    {c.excluded && c.reason ? ` · ${c.reason}` : ''}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2">
+                  {c.excluded ? (
+                    <Badge tone="info">
+                      {c.excluded_from && c.excluded_from >= nextBill
+                        ? `Excused from ${formatDate(c.excluded_from)}`
+                        : `Excused since ${formatDate(c.excluded_from ?? nextBill)}`}
+                    </Badge>
+                  ) : c.charged_again_from ? (
+                    <Badge tone="warn">Charged again from {formatDate(c.charged_again_from)}</Badge>
+                  ) : (
+                    <Badge tone="neutral">Charged</Badge>
+                  )}
+                  {canManage &&
+                    (c.excluded ? (
+                      <Button disabled={include.isPending} onClick={() => include.mutate({ leaseId, charge_code: c.charge_code })}>
+                        Charge again
+                      </Button>
+                    ) : (
+                      <Button onClick={() => setExcusing(c)}>Excuse…</Button>
+                    ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {rows.length > 0 && (
+          <span className="text-xs text-muted">Changes apply from the next bill ({formatDate(nextBill, { year: true })}).</span>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function ExcuseChargePanel({
+  leaseId,
+  charge,
+  nextBill,
+  onClose,
+}: {
+  leaseId: number;
+  charge: LeaseCharge;
+  nextBill: string;
+  onClose: () => void;
+}) {
+  const exclude = useExcludeCharge();
+  const [reason, setReason] = useState('');
+  const errors = fieldErrors(exclude.error);
+  const message = errors.charge_code ?? errors.lease ?? formMessage(exclude.error, ['charge_code', 'lease', 'reason']);
+
+  return (
+    <SidePanel title={`Excuse from ${charge.label.toLowerCase()}`} subtitle="This tenant only" onClose={onClose} className="flex-none">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          exclude.mutate({ leaseId, charge_code: charge.charge_code, reason }, { onSuccess: onClose });
+        }}
+      >
+        {message && <Notice tone="danger">{message}</Notice>}
+        <TextField
+          label="Reason (optional)"
+          value={reason}
+          maxLength={500}
+          onChange={(e) => setReason(e.target.value)}
+          error={errors.reason}
+        />
+        <span className="text-xs text-muted">
+          From the next bill ({formatDate(nextBill, { year: true })}), {charge.label.toLowerCase()} is left off this tenant&apos;s bills
+          {charge.billing_type === 'metered'
+            ? ' and no meter readings are needed (that bill still charges last month’s usage if it was read)'
+            : ''}
+          . The next tenant of this house pays it. To change a bill already made, open it and choose Re-bill.
+        </span>
+        <Button type="submit" variant="primary" size="lg" disabled={exclude.isPending}>
+          {exclude.isPending ? 'Saving…' : 'Excuse tenant'}
         </Button>
       </form>
     </SidePanel>
